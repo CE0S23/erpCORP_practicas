@@ -1,59 +1,60 @@
-# ErpCesarRamirez
+# ERPPro — Sistema ERP Escalable
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.3.16.
+> Angular 20 + Node.js 22 + PrimeNG | Arquitectura desacoplada
 
-## Development server
+---
 
-To start a local development server, run:
+## 🚀 Cómo correr el proyecto
 
+### Frontend (Angular 20)
 ```bash
-ng serve
+npm start          # http://localhost:4200
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
+### Backend (Node.js 22 + Express)
 ```bash
-ng generate component component-name
+node server.js     # http://localhost:3000
+# o con hot-reload:
+npm run server:dev
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+---
 
-```bash
-ng generate --help
+## 📁 Estructura del Proyecto
+
+```
+src/app/
+├── models/
+│   └── user.model.ts          # Interfaces: User, LoginRequest, RegisterRequest, ApiResponse
+├── components/
+│   ├── custom-input/          # Wrapper de pInputText (ControlValueAccessor)
+│   ├── custom-button/         # Wrapper de p-button (variantes, tamaños)
+│   └── custom-card/           # Wrapper de p-card (con ng-content)
+├── pages/
+│   ├── landing/               # Landing Page (hero + features + CTA)
+│   ├── login/                 # Login con ReactiveForm
+│   └── register/              # Register con validador cross-field
+├── services/
+│   └── auth.service.ts        # Estado de autenticación + HttpClient
+└── app.routes.ts              # Lazy loading: /, /login, /register
 ```
 
-## Building
+---
 
-To build the project run:
+## 🔑 Credenciales de prueba (backend en memoria)
 
-```bash
-ng build
-```
+| Email              | Password   | Rol   |
+|--------------------|------------|-------|
+| admin@erp.com      | admin123   | admin |
+| cesar@erp.com      | cesar123   | user  |
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+---
 
-## Running unit tests
+## 🏗️ Principios de Ingeniería aplicados
 
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+- **Cero `any`**: Todas las entidades tienen interfaces TypeScript tipadas
+- **Desacoplamiento de PrimeNG**: Las páginas solo importan `components/`, nunca PrimeNG directamente
+- **Clean Code**: Lógica delegada al `AuthService`; páginas solo orquestan la UI
+- **Lazy Loading**: Cada página se carga bajo demanda
+- **ControlValueAccessor**: `CustomInput` compatible con `formControlName`
+- **Signals** en Login/Register para estados reactivos sin Zone.js
