@@ -41,10 +41,10 @@ import { LoginRequest } from '../../models/user.model';
               formControlName="password"
               label="Contraseña"
               type="password"
-              placeholder="••••••••"
+              placeholder="••••••••••"
               inputId="login-password"
               [hasError]="isFieldInvalid('password')"
-              errorMessage="La contraseña debe tener al menos 6 caracteres"
+              errorMessage="La contraseña es obligatoria"
             />
 
             @if (errorMessage()) {
@@ -68,6 +68,21 @@ import { LoginRequest } from '../../models/user.model';
               [loading]="isLoading()"
             />
           </form>
+
+          <!-- Credenciales hardcodeadas visibles para demo -->
+          <div class="credentials-hint">
+            <p class="hint-title">🔑 Credenciales de prueba</p>
+            <div class="hint-row">
+              <span class="hint-badge admin">ADMIN</span>
+              <code>admin&#64;erp.com</code>
+              <code>Admin&#64;Secure1</code>
+            </div>
+            <div class="hint-row">
+              <span class="hint-badge user">USER</span>
+              <code>cesar&#64;erp.com</code>
+              <code>Cesar&#64;Secure1</code>
+            </div>
+          </div>
 
           <div class="auth-footer">
             <p>¿No tienes cuenta? <a routerLink="/register" class="auth-link">Regístrate aquí</a></p>
@@ -161,6 +176,36 @@ import { LoginRequest } from '../../models/user.model';
       75% { transform: translateX(4px); }
     }
 
+    /* ─── Credentials hint panel ─── */
+    .credentials-hint {
+      margin-top: 1.25rem;
+      background: rgba(99,102,241,0.06);
+      border: 1px solid rgba(99,102,241,0.18);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+    }
+    .hint-title {
+      font-size: 0.78rem; font-weight: 700; color: #818cf8;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin: 0 0 0.6rem 0;
+    }
+    .hint-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      margin-bottom: 0.35rem; flex-wrap: wrap;
+    }
+    .hint-badge {
+      font-size: 0.65rem; font-weight: 700;
+      padding: 2px 7px; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .hint-badge.admin { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+    .hint-badge.user  { background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); }
+    .hint-row code {
+      font-size: 0.78rem; color: #d1d5db;
+      background: rgba(255,255,255,0.05); padding: 2px 6px;
+      border-radius: 5px; font-family: 'Courier New', monospace;
+    }
+
     .auth-footer { margin-top: 1.5rem; text-align: center; }
     .auth-footer p { color: #6b7280; font-size: 0.88rem; }
     .auth-link { color: #818cf8; text-decoration: none; font-weight: 600; }
@@ -178,7 +223,7 @@ export class Login {
 
   readonly loginForm = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(6)]],
+    password: ['', [Validators.required]],
   });
 
   isFieldInvalid(field: string): boolean {
@@ -210,14 +255,14 @@ export class Login {
         this.isLoading.set(false);
         if (response.success) {
           this.successMessage.set(`¡Bienvenido, ${response.data?.name}!`);
-          setTimeout(() => this.router.navigate(['/dashboard']), 1000);
+          setTimeout(() => this.router.navigate(['/dashboard']), 1200);
         } else {
           this.errorMessage.set(response.message);
         }
       },
       error: () => {
         this.isLoading.set(false);
-        this.errorMessage.set('Credenciales incorrectas. Verifica tu email y contraseña.');
+        this.errorMessage.set('Error inesperado. Intenta nuevamente.');
       },
     });
   }
