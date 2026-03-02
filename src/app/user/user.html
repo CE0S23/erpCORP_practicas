@@ -1,0 +1,9 @@
+<p-toast position="top-right" />
+<div class="user-page">
+    <div class="user-layout">
+        <p-listbox [options]="users" [(ngModel)]="selectedUser" optionLabel="name" class="user-list" />
+        <div class="profile-wrap">
+            <app-profile-card [user]="selectedUser" />
+        </div>
+    </div>
+</div>

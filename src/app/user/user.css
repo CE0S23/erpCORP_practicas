@@ -1,0 +1,20 @@
+.user-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.user-layout {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.user-list {
+    width: 220px;
+    flex-shrink: 0;
+}
+
+.profile-wrap {
+    flex: 1;
+}

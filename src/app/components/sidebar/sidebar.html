@@ -1,0 +1,19 @@
+<aside class="sidebar" [class.collapsed]="collapsed">
+    <div class="sidebar-top">
+        <span class="brand-name" *ngIf="!collapsed">ERP<strong>Pro</strong></span>
+        <button class="toggle-btn" (click)="toggle()" [title]="collapsed ? 'Expandir' : 'Contraer'">
+            <i [class]="collapsed ? 'pi pi-chevron-right' : 'pi pi-chevron-left'"></i>
+        </button>
+    </div>
+
+    <nav class="sidebar-nav">
+        @for (item of navItems; track item.route) {
+        <a [routerLink]="item.route" routerLinkActive="active" class="nav-item" [title]="item.label">
+            <i [class]="item.icon"></i>
+            <span class="nav-label" *ngIf="!collapsed">{{ item.label }}</span>
+        </a>
+        }
+    </nav>
+
+    <div class="sidebar-version" *ngIf="!collapsed">v {{ version }}</div>
+</aside>

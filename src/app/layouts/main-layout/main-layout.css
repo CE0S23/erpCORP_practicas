@@ -1,0 +1,13 @@
+.layout {
+    display: flex;
+    min-height: 100vh;
+    background: #0a0a14;
+    font-family: 'Inter', sans-serif;
+}
+
+.layout-content {
+    flex: 1;
+    padding: 2rem;
+    color: #f9fafb;
+    overflow-y: auto;
+}

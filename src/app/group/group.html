@@ -1,0 +1,129 @@
+<p-toast position="top-right" />
+<p-confirmDialog />
+
+<div class="group-page">
+
+    <!-- Stats row -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <i class="pi pi-users stat-icon"></i>
+            <div class="stat-info">
+                <span class="stat-value">{{ totalGroups() }}</span>
+                <span class="stat-label">Grupos</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <i class="pi pi-user stat-icon accent-green"></i>
+            <div class="stat-info">
+                <span class="stat-value">{{ totalMembers() }}</span>
+                <span class="stat-label">Miembros</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <i class="pi pi-ticket stat-icon accent-amber"></i>
+            <div class="stat-info">
+                <span class="stat-value">{{ totalTickets() }}</span>
+                <span class="stat-label">Tickets</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table card -->
+    <p-table [value]="groups()" [paginator]="true" [rows]="8" [rowsPerPageOptions]="[5, 8, 15]" dataKey="id"
+        styleClass="p-datatable-sm">
+        <ng-template pTemplate="caption">
+            <div class="table-caption">
+                <span class="table-title">Grupos</span>
+                <p-button label="Nuevo Grupo" icon="pi pi-plus" (onClick)="openCreate()" />
+            </div>
+        </ng-template>
+
+        <ng-template pTemplate="header">
+            <tr>
+                <th pSortableColumn="id">ID <p-sortIcon field="id" /></th>
+                <th pSortableColumn="nombre">Nombre <p-sortIcon field="nombre" /></th>
+                <th pSortableColumn="categoria">Categoría <p-sortIcon field="categoria" /></th>
+                <th pSortableColumn="nivel">Nivel <p-sortIcon field="nivel" /></th>
+                <th pSortableColumn="autor">Autor <p-sortIcon field="autor" /></th>
+                <th pSortableColumn="miembros">Miembros <p-sortIcon field="miembros" /></th>
+                <th pSortableColumn="tickets">Tickets <p-sortIcon field="tickets" /></th>
+                <th>Acciones</th>
+            </tr>
+        </ng-template>
+
+        <ng-template pTemplate="body" let-group>
+            <tr>
+                <td><code class="id-cell">{{ group.id }}</code></td>
+                <td><strong>{{ group.nombre }}</strong></td>
+                <td>{{ group.categoria }}</td>
+                <td>
+                    <p-tag [value]="group.nivel" [severity]="levelSeverity(group.nivel)" />
+                </td>
+                <td>{{ group.autor }}</td>
+                <td>{{ group.miembros }}</td>
+                <td>{{ group.tickets }}</td>
+                <td>
+                    <div class="action-buttons">
+                        <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" severity="info"
+                            (onClick)="openEdit(group)" pTooltip="Editar" />
+                        <p-button icon="pi pi-trash" [text]="true" [rounded]="true" severity="danger"
+                            (onClick)="confirmDelete(group)" pTooltip="Eliminar" />
+                    </div>
+                </td>
+            </tr>
+        </ng-template>
+
+        <ng-template pTemplate="emptymessage">
+            <tr>
+                <td colspan="8" class="empty-msg">
+                    <i class="pi pi-inbox"></i> Sin grupos registrados
+                </td>
+            </tr>
+        </ng-template>
+    </p-table>
+</div>
+
+<!-- Dialog Crear / Editar -->
+<p-dialog [header]="editingId ? 'Editar Grupo' : 'Nuevo Grupo'" [(visible)]="dialogVisible" [modal]="true"
+    [style]="{ width: '480px' }" [draggable]="false">
+    <div class="dialog-form">
+
+        <div class="field">
+            <label for="g-nombre">Nombre *</label>
+            <input pInputText id="g-nombre" [(ngModel)]="draft.nombre" placeholder="Ej. Alpha Team" />
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                <label for="g-cat">Categoría</label>
+                <p-select id="g-cat" [options]="categories" [(ngModel)]="draft.categoria" placeholder="Seleccionar" />
+            </div>
+            <div class="field">
+                <label for="g-nivel">Nivel</label>
+                <p-select id="g-nivel" [options]="levels" [(ngModel)]="draft.nivel" placeholder="Seleccionar" />
+            </div>
+        </div>
+
+        <div class="field">
+            <label for="g-autor">Autor</label>
+            <input pInputText id="g-autor" [(ngModel)]="draft.autor" placeholder="Nombre del autor" />
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                <label for="g-miembros">Miembros</label>
+                <p-inputNumber id="g-miembros" [(ngModel)]="draft.miembros" [min]="0" [showButtons]="true" />
+            </div>
+            <div class="field">
+                <label for="g-tickets">Tickets</label>
+                <p-inputNumber id="g-tickets" [(ngModel)]="draft.tickets" [min]="0" [showButtons]="true" />
+            </div>
+        </div>
+
+    </div>
+
+    <ng-template pTemplate="footer">
+        <p-button label="Cancelar" icon="pi pi-times" [text]="true" (onClick)="dialogVisible = false" />
+        <p-button label="Guardar" icon="pi pi-check" (onClick)="save()" />
+    </ng-template>
+</p-dialog>
