@@ -1,0 +1,79 @@
+.tickets-page {
+  padding: 1.5rem;
+}
+
+.cell-truncate {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Formulario del modal ── */
+.ticket-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-top: 0.5rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.form-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--p-text-color);
+}
+
+.required-star {
+  color: var(--p-red-400, #f87171);
+  margin-left: 2px;
+}
+
+.form-hint {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--p-text-muted-color);
+  margin-left: 4px;
+}
+
+.form-hint-msg {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+}
+
+.field-error input,
+.field-error .p-select {
+  border-color: var(--p-red-400, #f87171) !important;
+}
+
+.error-msg {
+  font-size: 0.75rem;
+  color: var(--p-red-400, #f87171);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ── Footer del diálogo ── */
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+:host ::ng-deep .ticket-form-dialog .save-btn {
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}

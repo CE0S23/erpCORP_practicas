@@ -1,0 +1,277 @@
+<p-toast position="top-center" />
+<p-confirmDialog />
+
+<div class="tickets-page">
+
+  <p-breadcrumb [model]="breadcrumbItems" [home]="breadcrumbHome" styleClass="mb-3" />
+
+  <p-table
+    [value]="tickets()"
+    [paginator]="true"
+    [rows]="10"
+    [rowsPerPageOptions]="[5,10,20]"
+    dataKey="id"
+    styleClass="p-datatable-sm p-datatable-striped p-datatable-gridlines"
+    [globalFilterFields]="['titulo','assignedName','groupName','status','priority']"
+    #dt
+  >
+    <ng-template pTemplate="caption">
+      <div class="flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="text-xl font-bold">Tickets</span>
+        <div class="flex gap-2 align-items-center">
+          <span class="p-input-icon-left">
+            <i class="pi pi-search"></i>
+            <input pInputText type="text" (input)="dt.filterGlobal($any($event.target).value, 'contains')" placeholder="Buscar ticket..." />
+          </span>
+          <p-button label="Exportar CSV" icon="pi pi-download" severity="secondary" [outlined]="true" (onClick)="dt.exportCSV()" />
+          <p-button label="Nuevo Ticket" icon="pi pi-plus" (onClick)="openCreate()" />
+        </div>
+      </div>
+    </ng-template>
+
+    <ng-template pTemplate="header">
+      <tr>
+        <th style="min-width:14rem" pSortableColumn="titulo">Título <p-sortIcon field="titulo" /></th>
+        <th style="min-width:7rem" pSortableColumn="status">
+          Estado
+          <p-columnFilter field="status" matchMode="equals" display="menu">
+            <ng-template pTemplate="filter" let-value let-filter="filterCallback">
+              <p-select [options]="statusOptions" [ngModel]="value" (onChange)="filter($event.value)" placeholder="Todos" />
+            </ng-template>
+          </p-columnFilter>
+        </th>
+        <th style="min-width:7rem" pSortableColumn="priority">
+          Prioridad
+          <p-columnFilter field="priority" matchMode="equals" display="menu">
+            <ng-template pTemplate="filter" let-value let-filter="filterCallback">
+              <p-select [options]="priorityOptions" [ngModel]="value" (onChange)="filter($event.value)" placeholder="Todas" />
+            </ng-template>
+          </p-columnFilter>
+        </th>
+        <th style="min-width:9rem" pSortableColumn="groupName">Grupo <p-sortIcon field="groupName" /></th>
+        <th style="min-width:9rem" pSortableColumn="assignedName">Asignado a <p-sortIcon field="assignedName" /></th>
+        <th style="min-width:7rem" pSortableColumn="createdAt">FC <p-sortIcon field="createdAt" /></th>
+        <th style="min-width:7rem" pSortableColumn="dueDate">FL <p-sortIcon field="dueDate" /></th>
+        <th style="width:8rem">Acciones</th>
+      </tr>
+    </ng-template>
+
+    <ng-template pTemplate="body" let-ticket>
+      <tr>
+        <td><span class="cell-truncate" style="max-width:13rem" [pTooltip]="ticket.titulo" tooltipPosition="top">{{ ticket.titulo }}</span></td>
+        <td><p-tag [value]="ticket.status" [severity]="statusSeverity(ticket.status)" /></td>
+        <td><p-tag [value]="ticket.priority" [severity]="prioritySeverity(ticket.priority)" /></td>
+        <td><span class="cell-truncate" style="max-width:8rem" [pTooltip]="ticket.groupName">{{ ticket.groupName }}</span></td>
+        <td><span class="cell-truncate" style="max-width:8rem" [pTooltip]="ticket.assignedName">{{ ticket.assignedName }}</span></td>
+        <td>{{ ticket.createdAt | date:'dd/MM/yy' }}</td>
+        <td>{{ ticket.dueDate | date:'dd/MM/yy' }}</td>
+        <td>
+          <div class="flex gap-1">
+            <p-button icon="pi pi-eye" [text]="true" [rounded]="true" severity="info" (onClick)="openDetail(ticket)" pTooltip="Ver detalle" />
+            <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" severity="warn" (onClick)="openEdit(ticket)" pTooltip="Editar" />
+            <p-button icon="pi pi-trash" [text]="true" [rounded]="true" severity="danger" (onClick)="confirmDelete(ticket)" pTooltip="Eliminar" />
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="8" class="text-center p-4">
+          <i class="pi pi-inbox text-4xl text-300 block mb-2"></i>
+          <span class="text-500">No hay tickets registrados</span>
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+
+<!-- ── MODAL DETALLE ── -->
+<p-dialog header="Detalle del Ticket" [(visible)]="detailVisible" [modal]="true" [style]="{ width: '640px' }" [draggable]="false">
+  @if (selectedTicket) {
+  <div class="flex flex-column gap-3">
+    <div class="flex align-items-center gap-2">
+      <p-tag [value]="selectedTicket.status" [severity]="statusSeverity(selectedTicket.status)" />
+      <p-tag [value]="selectedTicket.priority" [severity]="prioritySeverity(selectedTicket.priority)" />
+      <span class="text-500 text-sm">{{ selectedTicket.groupName }}</span>
+    </div>
+    <h2 class="m-0 text-xl">{{ selectedTicket.titulo }}</h2>
+    <p class="m-0 line-height-3">{{ selectedTicket.descripcion }}</p>
+    <div class="grid">
+      <div class="col-6">
+        <span class="block text-500 text-xs uppercase mb-1">Asignado a</span>
+        <span class="font-semibold">{{ selectedTicket.assignedName }}</span>
+      </div>
+      <div class="col-3">
+        <span class="block text-500 text-xs uppercase mb-1">Creado</span>
+        <span>{{ selectedTicket.createdAt | date:'dd/MM/yyyy' }}</span>
+      </div>
+      <div class="col-3">
+        <span class="block text-500 text-xs uppercase mb-1">Fecha Límite</span>
+        <span>{{ selectedTicket.dueDate | date:'dd/MM/yyyy' }}</span>
+      </div>
+    </div>
+    <p-divider />
+    @if (selectedTicket.comments.length > 0) {
+    <div>
+      <span class="block font-semibold mb-2"><i class="pi pi-comments mr-1"></i> Comentarios</span>
+      @for (comment of selectedTicket.comments; track comment.id) {
+      <div class="border-round surface-100 p-3 mb-2">
+        <div class="flex justify-content-between mb-1">
+          <span class="font-semibold text-sm">{{ comment.author }}</span>
+          <span class="text-500 text-xs">{{ comment.date | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+        <p class="m-0 text-sm">{{ comment.text }}</p>
+      </div>
+      }
+    </div>
+    }
+    @if (selectedTicket.history.length > 0) {
+    <div>
+      <span class="block font-semibold mb-2"><i class="pi pi-history mr-1"></i> Historial de cambios</span>
+      <p-timeline [value]="selectedTicket.history" styleClass="text-sm">
+        <ng-template pTemplate="content" let-entry>
+          <span class="text-500 text-xs">{{ entry.changedBy }} cambió <strong>{{ entry.field }}</strong>:
+            <span class="text-red-400">{{ entry.oldValue }}</span> → <span class="text-green-500">{{ entry.newValue }}</span>
+          </span>
+        </ng-template>
+        <ng-template pTemplate="opposite" let-entry>
+          <span class="text-300 text-xs">{{ entry.date | date:'dd/MM HH:mm' }}</span>
+        </ng-template>
+      </p-timeline>
+    </div>
+    }
+  </div>
+  <ng-template pTemplate="footer">
+    <p-button label="Editar" icon="pi pi-pencil" (onClick)="openEdit(selectedTicket!)" />
+    <p-button label="Cerrar" icon="pi pi-times" [text]="true" (onClick)="detailVisible = false" />
+  </ng-template>
+  }
+</p-dialog>
+
+<!-- ── MODAL CREAR / EDITAR TICKET ── -->
+<p-dialog
+  [header]="editingId ? 'Editar Ticket' : 'Nuevo Ticket'"
+  [(visible)]="formVisible"
+  [modal]="true"
+  [style]="{ width: '600px' }"
+  [draggable]="false"
+  [closable]="!isSaving()"
+  styleClass="ticket-form-dialog"
+>
+  <div class="ticket-form">
+
+    <!-- Título -->
+    <div class="form-field" [class.field-error]="submitted && !draft.titulo.trim()">
+      <label class="form-label">
+        Título <span class="required-star">*</span>
+      </label>
+      <input
+        pInputText
+        [(ngModel)]="draft.titulo"
+        placeholder="Ej. Configurar CI/CD"
+        class="w-full"
+        [class.ng-invalid]="submitted && !draft.titulo.trim()"
+      />
+      @if (submitted && !draft.titulo.trim()) {
+        <small class="error-msg"><i class="pi pi-exclamation-circle mr-1"></i>El título es obligatorio</small>
+      }
+    </div>
+
+    <!-- Descripción -->
+    <div class="form-field">
+      <label class="form-label">Descripción</label>
+      <textarea
+        pTextarea
+        [(ngModel)]="draft.descripcion"
+        rows="3"
+        placeholder="Describe el problema o tarea con detalle..."
+        class="w-full"
+      ></textarea>
+    </div>
+
+    <!-- Estado + Prioridad -->
+    <div class="form-row">
+      <div class="form-field">
+        <label class="form-label">Estado <span class="required-star">*</span></label>
+        <p-select [options]="statusOptions" [(ngModel)]="draft.status" placeholder="Seleccionar" class="w-full" />
+      </div>
+      <div class="form-field">
+        <label class="form-label">Prioridad <span class="required-star">*</span></label>
+        <p-select [options]="priorityOptions" [(ngModel)]="draft.priority" placeholder="Seleccionar" class="w-full" />
+      </div>
+    </div>
+
+    <!-- Grupo -->
+    <div class="form-field" [class.field-error]="submitted && !draft.groupId">
+      <label class="form-label">
+        Grupo <span class="required-star">*</span>
+      </label>
+      <p-select
+        [options]="groupOptions()"
+        [(ngModel)]="draft.groupId"
+        (onChange)="onGroupChange()"
+        placeholder="Seleccionar grupo"
+        class="w-full"
+        [class.ng-invalid]="submitted && !draft.groupId"
+      />
+      @if (submitted && !draft.groupId) {
+        <small class="error-msg"><i class="pi pi-exclamation-circle mr-1"></i>Selecciona un grupo</small>
+      }
+    </div>
+
+    <!-- Asignado a -->
+    <div class="form-field">
+      <label class="form-label">
+        Asignado a
+        <span class="form-hint">(solo miembros del grupo seleccionado)</span>
+      </label>
+      <p-select
+        [options]="memberOptions()"
+        [(ngModel)]="draft.assignedTo"
+        (onChange)="onMemberChange()"
+        placeholder="Seleccionar miembro"
+        [disabled]="!draft.groupId"
+        class="w-full"
+      />
+      @if (!draft.groupId) {
+        <small class="form-hint-msg">Selecciona un grupo primero</small>
+      }
+    </div>
+
+    <!-- Fechas -->
+    <div class="form-row">
+      <div class="form-field">
+        <label class="form-label">Fecha de Creación</label>
+        <p-datepicker [(ngModel)]="draft.createdAt" dateFormat="dd/mm/yy" [showIcon]="true" class="w-full" />
+      </div>
+      <div class="form-field">
+        <label class="form-label">
+          Fecha Límite <span class="required-star">*</span>
+        </label>
+        <p-datepicker [(ngModel)]="draft.dueDate" dateFormat="dd/mm/yy" [showIcon]="true" class="w-full" />
+      </div>
+    </div>
+
+  </div>
+
+  <ng-template pTemplate="footer">
+    <div class="dialog-footer">
+      <p-button
+        label="Cancelar"
+        icon="pi pi-times"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="isSaving()"
+        (onClick)="cancelForm()"
+      />
+      <p-button
+        [label]="isSaving() ? 'Guardando...' : (editingId ? 'Actualizar' : 'Guardar')"
+        [icon]="isSaving() ? 'pi pi-spin pi-spinner' : 'pi pi-check'"
+        [disabled]="isSaving()"
+        (onClick)="save()"
+        styleClass="save-btn"
+      />
+    </div>
+  </ng-template>
+</p-dialog>
