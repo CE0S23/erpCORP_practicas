@@ -1,0 +1,106 @@
+<div class="perfil-page">
+  <p-breadcrumb
+    [model]="[{ label: 'Dashboard', routerLink: '/home' }, { label: 'Mi Perfil' }]"
+    [home]="{ icon: 'pi pi-home', routerLink: '/home' }"
+    styleClass="mb-4"
+  />
+
+  <div class="perfil-grid">
+
+    <!-- Tarjeta principal de identidad -->
+    <p-card styleClass="perfil-identity-card">
+      <div class="identity-body">
+        <p-avatar
+          [label]="initials()"
+          shape="circle"
+          size="xlarge"
+          styleClass="identity-avatar"
+        />
+        <div class="identity-info">
+          <h2 class="identity-name">{{ user?.name ?? 'Sin sesión' }}</h2>
+          <span class="identity-username">{{ '@' + (user?.username ?? '—') }}</span>
+          <p-tag
+            [value]="roleLabel()"
+            [severity]="roleSeverity()"
+            styleClass="mt-2"
+          />
+        </div>
+      </div>
+
+      <p-divider />
+
+      <div class="identity-meta">
+        <div class="meta-row">
+          <i class="pi pi-envelope meta-icon"></i>
+          <span>{{ user?.email ?? '—' }}</span>
+        </div>
+        @if (userGroup()) {
+          <div class="meta-row">
+            <i class="pi pi-users meta-icon"></i>
+            <span>{{ userGroup()!.nombre }}</span>
+            <p-tag [value]="userGroup()!.nivel" severity="secondary" styleClass="ml-auto" />
+          </div>
+          <div class="meta-row">
+            <i class="pi pi-folder meta-icon"></i>
+            <span>{{ userGroup()!.categoria }}</span>
+          </div>
+        } @else {
+          <div class="meta-row">
+            <i class="pi pi-users meta-icon"></i>
+            <span class="text-color-secondary">Sin grupo asignado</span>
+          </div>
+        }
+      </div>
+    </p-card>
+
+    <!-- Tarjeta de ajustes -->
+    <p-card header="Ajustes de cuenta" styleClass="perfil-settings-card">
+      <div class="settings-list">
+        @for (setting of mockSettings; track setting.label) {
+          <div class="setting-row">
+            <div class="setting-label">
+              <i [class]="setting.icon + ' setting-icon'"></i>
+              <span>{{ setting.label }}</span>
+            </div>
+            <span class="setting-value">{{ setting.value }}</span>
+          </div>
+          <p-divider styleClass="my-2" />
+        }
+      </div>
+
+      <p-button
+        label="Editar perfil"
+        icon="pi pi-user-edit"
+        styleClass="w-full mt-3"
+        [outlined]="true"
+        severity="secondary"
+      />
+    </p-card>
+
+    <!-- Tarjeta de estadísticas de sesión -->
+    <p-card header="Sesión actual" styleClass="perfil-session-card">
+      <div class="session-stats">
+        <div class="stat-item">
+          <span class="stat-label">Estado</span>
+          <p-tag value="Activa" severity="success" />
+        </div>
+        <p-divider />
+        <div class="stat-item">
+          <span class="stat-label">Tipo de cuenta</span>
+          <p-tag [value]="roleLabel()" [severity]="roleSeverity()" />
+        </div>
+        <p-divider />
+        <div class="stat-item">
+          <span class="stat-label">ID de usuario</span>
+          <span class="stat-value text-color-secondary">{{ user?.id ?? '—' }}</span>
+        </div>
+        <p-divider />
+        <div class="stat-item">
+          <span class="stat-label">Autenticación</span>
+          <p-tag value="Hardcoded" severity="secondary" />
+        </div>
+      </div>
+    </p-card>
+
+  </div>
+</div>
