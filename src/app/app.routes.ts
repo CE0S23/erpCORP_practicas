@@ -32,9 +32,19 @@ export const routes: Routes = [
                     import('./group/group').then((m) => m.GroupPage),
             },
             {
-                path: 'user',
+                path: 'tickets',
                 loadComponent: () =>
-                    import('./user/user').then((m) => m.UserPage),
+                    import('./pages/tickets/tickets').then((m) => m.TicketsPage),
+            },
+            {
+                path: 'usuarios',
+                loadComponent: () =>
+                    import('./components/usuarios/usuarios').then((m) => m.UsuariosPage),
+            },
+            {
+                path: 'perfil',
+                loadComponent: () =>
+                    import('./components/perfil/perfil').then((m) => m.Perfil),
             },
         ],
     },
