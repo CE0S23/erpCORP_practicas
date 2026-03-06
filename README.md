@@ -108,3 +108,194 @@ Nuevos avances en las vistas interiores con logica de negocio.
 - CSS minimo: solo para layout o colores especificos que PrimeNG no cubre
 - Lazy loading en todas las rutas
 - Archivo centralizado de rutas (`app.paths.ts`) para evitar strings duplicados
+
+---
+
+### Practica 5 — Tickets, Dashboard, Kanban y Gestión de Miembros
+
+Implementación completa del módulo de tickets, dashboard estadístico y vista Kanban/Lista con gestión de miembros.
+
+#### Nuevos Modelos
+- `ticket.model.ts`: `TicketStatus`, `TicketPriority`, `TicketComment`, `TicketHistoryEntry`, `Ticket`
+- `group.model.ts`: extendido con `GroupMember` y `memberList: GroupMember[]`
+
+#### Nuevos Servicios
+- `ticket.service.ts`: CRUD con signals, 8 mocks, computed `statsCount` y `ticketsByStatus`
+  - **Validación de negocio**: `update()` verifica que el nuevo `assignedTo` pertenezca al `memberList` del grupo del ticket via `GroupService.isMemberOfGroup()`
+- `group.service.ts`: extendido con `addMember()`, `removeMember()`, `getMembersByGroupId()`, `isMemberOfGroup()`, y mocks con `memberList` real
+
+#### Nuevas Páginas (ng generate)
+```bash
+ng generate component pages/tickets --standalone --skip-tests
+```
+
+#### Páginas modificadas
+- **Dashboard** (`/home`): 4 stat cards reactivas, `p-chart` doughnut de tickets por status, tabla de 5 tickets más recientes, `p-skeleton` loading, `p-toast` bienvenida
+- **Tickets** (`/home/tickets`): `p-table` con filtros de status/prioridad, búsqueda global, exportación CSV, `p-breadcrumb`, detail dialog con `p-timeline` de historial, form dialog con `p-select` filtrado por miembros del grupo
+- **Grupos** (`/home/group`): click-to-select grupo, `p-selectButton` toggle Kanban/Lista, CdkDragDrop entre columnas de status, `p-panel` colapsable de miembros con añadir por email y eliminar
+- **Sidebar**: 4 nav items (Dashboard, Tickets, Grupos, Usuario), búsqueda global inline que filtra `filteredNavItems()`
+
+#### Fix de Overflow
+- `src/styles.css`: clase global `.cell-truncate` (text-overflow: ellipsis)
+- Aplicada en todas las celdas de texto largo en tablas y cards kanban
+
+#### Dependencia agregada
+```bash
+npm install chart.js --save --legacy-peer-deps
+```
+
+---
+
+#### Actualización de Estructura
+
+```
+src/app/
+├── models/
+│   ├── user.model.ts
+│   ├── group.model.ts       ← GroupMember + memberList
+│   └── ticket.model.ts      ← NUEVO
+├── services/
+│   ├── auth.service.ts
+│   ├── group.service.ts     ← addMember, removeMember, isMemberOfGroup
+│   └── ticket.service.ts   ← NUEVO (CRUD + validación por grupo)
+├── pages/
+│   ├── home/               ← Dashboard reescrito
+│   └── tickets/            ← NUEVO módulo
+├── group/                  ← Kanban/Lista/Miembros
+└── components/
+    └── sidebar/            ← Búsqueda global
+```
+
+#### Git Commits (Conventional Commits)
+
+```bash
+git add src/app/models/ticket.model.ts src/app/models/group.model.ts
+git commit -m "feat(models): add Ticket model and extend Group with GroupMember"
+
+git add src/app/services/ticket.service.ts src/app/services/group.service.ts
+git commit -m "feat(services): add TicketService with business validation and extend GroupService with member CRUD"
+
+git add src/app/pages/home/ src/app/pages/tickets/ src/app/app.routes.ts src/app/app.paths.ts
+git commit -m "feat(pages): add Dashboard with p-chart and Tickets module with DynamicDialog"
+
+git add src/app/group/ src/app/components/sidebar/ src/styles.css
+git commit -m "feat(group): add Kanban/List toggle with CdkDragDrop, member management, and global overflow fix"
+
+git add README.md package.json package-lock.json
+git commit -m "docs: update README with Practica 5 changelog and install chart.js"
+
+git push origin main
+```
+
+---
+
+### Práctica 6 — Perfil, Usuarios (refactorización), Rediseño Modal Ticket y Clean Code
+
+Refactorización arquitectural completa: nuevos componentes `Perfil` y `Usuarios`, rediseño UX del modal de tickets, lógica de cruce de datos y eliminación de código muerto.
+
+#### Componentes generados / refactorizados
+
+```bash
+# Equivalente al siguiente ng generate (creados manualmente como standalone):
+ng generate component components/perfil --standalone --skip-tests
+ng generate component components/usuarios --standalone --skip-tests
+```
+
+#### Nueva arquitectura de Perfil (`components/perfil/`)
+
+Muestra datos de la sesión activa usando mock data enriquecido:
+
+| Sección          | Contenido                                               |
+|------------------|---------------------------------------------------------|
+| Identidad        | Avatar con iniciales, nombre, @username, rol con p-tag |
+| Datos de contacto| Email, grupo asignado (cruzado de GroupService), nivel  |
+| Ajustes          | Listado de configuraciones (Notificaciones, Tema, Idioma, 2FA) |
+| Sesión actual    | Estado activo, tipo de cuenta, ID de usuario             |
+
+**Componentes PrimeNG usados**: `p-card`, `p-divider`, `p-avatar`, `p-tag`, `p-button`, `p-breadcrumb`
+
+**Lógica de cruce**: `userGroup` es un `computed()` que busca en `GroupService.groups()` el grupo al que pertenece el usuario logueado, usando `memberList.some(m => m.id === user.id)`.
+
+#### Nueva arquitectura de Usuarios (`components/usuarios/`)
+
+Sustituye al antiguo `user/` page. Muestra **todos los miembros de todos los grupos** en una sola `p-table`:
+
+| Columna  | Fuente de datos                             |
+|----------|---------------------------------------------|
+| Nombre   | `GroupMember.name`                          |
+| Grupo    | `Group.nombre` (cruzado por `memberList`)   |
+| Rol      | `GroupMember.role` → p-tag con severidad    |
+| Correo   | `GroupMember.email`                         |
+| Estatus  | Hardcoded `'Activo'` (mock)                 |
+| Acciones | Editar / Eliminar (toast informativo)        |
+
+**Lógica de cruce**: El computed `usuarios()` itera `GroupService.groups()` y por cada grupo aplana `memberList` enriqueciendo cada fila con `grupoId` y `grupo`.
+
+#### Rutas actualizadas (`app.paths.ts` / `app.routes.ts`)
+
+```
+/home/user      → ELIMINADA
+/home/usuarios  → UsuariosPage (components/usuarios/)
+/home/perfil    → Perfil       (components/perfil/)
+```
+
+#### Sidebar actualizado (`components/sidebar/`)
+
+```typescript
+{ label: 'Usuarios',   icon: 'pi pi-user',    route: APP_PATHS.usuarios },
+{ label: 'Mi Perfil',  icon: 'pi pi-id-card', route: APP_PATHS.perfil   },
+```
+
+#### Rediseño UX del Modal de Tickets
+
+El modal `p-dialog` de crear/editar tickets fue completamente rediseñado:
+
+- **Validación en tiempo real**: flag `submitted` activa clases `ng-invalid` y `field-error` solo tras el primer intento de guardar
+- **Mensajes de error inline**: `<small class="error-msg">` bajo campos inválidos
+- **Layout en dos columnas** (`form-row`) para Estado/Prioridad y Fechas
+- **Indicadores de campo obligatorio** (`*`) en rojo con `required-star`
+- **Footer con contraste**: botón Guardar/Actualizar con `p-button` primario destacado, Cancelar con `severity="secondary" outlined`
+- **Bloqueo de cierre** mientras se guarda: `[closable]="!isSaving()"`
+- `cancelForm()` resetea `submitted` al cancelar
+
+#### Clean Code aplicado
+
+- ❌ Eliminados: todos los comentarios inline obvios del código TypeScript/HTML
+- ❌ Eliminado: CSS muerto del componente `user/user.css`
+- ✅ `submitted = false` se resetea en `openCreate()`, `openEdit()`, `cancelForm()` y al guardar exitosamente
+- ✅ Todos los componentes nuevos son `standalone: true` sin dependencias circulares
+
+#### Estructura actualizada
+
+```
+src/app/
+├── app.paths.ts              ← usuarios + perfil (reemplaza user)
+├── app.routes.ts             ← lazy routes actualizadas
+├── components/
+│   ├── perfil/               ← NUEVO (p-card, p-avatar, p-tag)
+│   ├── usuarios/             ← NUEVO (p-table con cruce GroupService)
+│   └── sidebar/              ← navItems actualizados
+└── pages/
+    └── tickets/
+        ├── tickets.ts        ← submitted, cancelForm(), save() mejorado
+        ├── tickets.html      ← modal rediseñado con validaciones
+        └── tickets.css       ← estilos form-field, form-row, error-msg
+```
+
+#### Git Commits (Conventional Commits)
+
+```bash
+git add src/app/components/perfil/ src/app/components/usuarios/
+git commit -m "feat: add Perfil and Usuarios standalone components with GroupService data binding"
+
+git add src/app/app.paths.ts src/app/app.routes.ts src/app/components/sidebar/sidebar.ts
+git commit -m "refactor: replace /user route with /usuarios and /perfil, update sidebar navItems"
+
+git add src/app/pages/tickets/tickets.ts src/app/pages/tickets/tickets.html src/app/pages/tickets/tickets.css
+git commit -m "feat: refactor user components and optimize ticket modal UX with real-time validation"
+
+git add README.md
+git commit -m "docs: update README with Practica 6 architecture - Perfil, Usuarios, ticket modal redesign"
+
+git push origin main
+```
