@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
+import { provideZonelessChangeDetection } from '@angular/core';
 import { CustomButton } from './custom-button';
 
 describe('CustomButton', () => {
@@ -8,9 +8,9 @@ describe('CustomButton', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [CustomButton]
-    })
-    .compileComponents();
+      imports: [CustomButton],
+      providers: [provideZonelessChangeDetection()],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(CustomButton);
     component = fixture.componentInstance;

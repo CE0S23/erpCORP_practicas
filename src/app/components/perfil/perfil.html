@@ -1,10 +1,4 @@
 <div class="perfil-page">
-  <p-breadcrumb
-    [model]="[{ label: 'Dashboard', routerLink: '/home' }, { label: 'Mi Perfil' }]"
-    [home]="{ icon: 'pi pi-home', routerLink: '/home' }"
-    styleClass="mb-4"
-  />
-
   <div class="perfil-grid">
 
     <!-- Tarjeta principal de identidad -->
@@ -19,11 +13,9 @@
         <div class="identity-info">
           <h2 class="identity-name">{{ user?.name ?? 'Sin sesión' }}</h2>
           <span class="identity-username">{{ '@' + (user?.username ?? '—') }}</span>
-          <p-tag
-            [value]="roleLabel()"
-            [severity]="roleSeverity()"
-            styleClass="mt-2"
-          />
+          <div class="identity-role-tag">
+            <p-tag [value]="roleLabel()" [severity]="roleSeverity()" />
+          </div>
         </div>
       </div>
 
@@ -38,7 +30,9 @@
           <div class="meta-row">
             <i class="pi pi-users meta-icon"></i>
             <span>{{ userGroup()!.nombre }}</span>
-            <p-tag [value]="userGroup()!.nivel" severity="secondary" styleClass="ml-auto" />
+            <div class="meta-row__end">
+              <p-tag [value]="userGroup()!.nivel" severity="secondary" />
+            </div>
           </div>
           <div class="meta-row">
             <i class="pi pi-folder meta-icon"></i>
@@ -68,13 +62,14 @@
         }
       </div>
 
-      <p-button
-        label="Editar perfil"
-        icon="pi pi-user-edit"
-        styleClass="w-full mt-3"
-        [outlined]="true"
-        severity="secondary"
-      />
+      <div class="settings-edit-btn">
+        <p-button
+          label="Editar perfil"
+          icon="pi pi-user-edit"
+          [outlined]="true"
+          severity="secondary"
+        />
+      </div>
     </p-card>
 
     <!-- Tarjeta de estadísticas de sesión -->

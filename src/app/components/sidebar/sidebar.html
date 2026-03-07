@@ -1,19 +1,56 @@
 <aside class="sidebar" [class.collapsed]="collapsed">
     <div class="sidebar-top">
-        <span class="brand-name" *ngIf="!collapsed">ERP<strong>Pro</strong></span>
+        @if (!collapsed) {
+            <a [routerLink]="paths.home" class="brand-link"
+                [title]="isInsideHome ? 'Volver al Home' : 'ERPPro'">
+                <span class="brand-name">
+                    ERP<strong>Pro</strong>
+                </span>
+                @if (isInsideHome) {
+                    <i class="pi pi-arrow-left brand-back-icon"></i>
+                }
+            </a>
+        }
         <button class="toggle-btn" (click)="toggle()" [title]="collapsed ? 'Expandir' : 'Contraer'">
             <i [class]="collapsed ? 'pi pi-chevron-right' : 'pi pi-chevron-left'"></i>
         </button>
     </div>
 
     <nav class="sidebar-nav">
-        @for (item of navItems; track item.route) {
-        <a [routerLink]="item.route" routerLinkActive="active" class="nav-item" [title]="item.label">
-            <i [class]="item.icon"></i>
-            <span class="nav-label" *ngIf="!collapsed">{{ item.label }}</span>
-        </a>
+        @if (!collapsed) {
+            <div class="sidebar-search">
+                <i class="pi pi-search"></i>
+                <input type="text" placeholder="Buscar..." [value]="searchTerm()"
+                    (input)="searchTerm.set($any($event.target).value)" />
+            </div>
+        }
+        @if (!isInsideHome) {
+            <a [routerLink]="paths.home" routerLinkActive="active" class="nav-item" [title]="'Dashboard'">
+                <i class="pi pi-home"></i>
+                @if (!collapsed) {
+                    <span class="nav-label">Dashboard</span>
+                }
+            </a>
+        }
+        @for (item of filteredNavItems(); track item.route) {
+            <a [routerLink]="item.route" routerLinkActive="active" class="nav-item" [title]="item.label">
+                <i [class]="item.icon"></i>
+                @if (!collapsed) {
+                    <span class="nav-label">{{ item.label }}</span>
+                }
+            </a>
         }
     </nav>
 
-    <div class="sidebar-version" *ngIf="!collapsed">v {{ version }}</div>
+    <div class="sidebar-footer">
+        <button class="logout-btn" (click)="logout()" title="Cerrar sesión">
+            <i class="pi pi-power-off"></i>
+            @if (!collapsed) {
+                <span class="nav-label">Cerrar sesión</span>
+            }
+        </button>
+        @if (!collapsed) {
+            <div class="sidebar-version">v {{ version }}</div>
+        }
+    </div>
 </aside>

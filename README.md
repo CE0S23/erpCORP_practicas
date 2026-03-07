@@ -299,3 +299,131 @@ git commit -m "docs: update README with Practica 6 architecture - Perfil, Usuari
 
 git push origin main
 ```
+
+---
+
+### Práctica 7 — RBAC (Control de Acceso Basado en Roles) + Catálogo Global de Errores
+
+Implementación de un sistema de permisos estructural con directivas Angular y un servicio centralizado de manejo de errores con toast automático.
+
+#### Comandos de generación utilizados
+
+```bash
+# La directiva y el servicio fueron creados manualmente como standalone
+# equivalentes a los siguientes comandos de CLI:
+ng generate directive directives/hasRole --standalone --skip-tests
+ng generate service services/permissionService --skip-tests
+ng generate service services/errorHandlerService --skip-tests
+```
+
+#### Archivos nuevos
+
+| Archivo | Descripción |
+|---------|-------------|
+| `models/role.model.ts` | Union type `AppRole`, mapa de permisos por rol, función `hasPermission()` |
+| `directives/has-role.directive.ts` | Directiva estructural `*hasRole` — elimina del DOM, no oculta |
+| `services/permission.service.ts` | Servicio DI centralizado `can(permission)` y `hasRole(roles)` |
+| `services/error-handler.service.ts` | Catálogo de errores + dispatch automático de toasts PrimeNG |
+
+#### Sistema de Roles (RBAC)
+
+| Rol     | Código   | Ver | Crear | Editar | Borrar |
+|---------|----------|:---:|:-----:|:------:|:------:|
+| ADMIN   | `admin`  | ✅  |  ✅   |   ✅   |   ✅   |
+| MEDIUM  | `medium` | ✅  |  ✅   |   ✅   |   ❌   |
+| BASE    | `user`   | ✅  |  ❌   |   ❌   |   ❌   |
+
+#### Credenciales de prueba actualizadas
+
+| Email            | Password        | Rol    |
+|------------------|-----------------|--------|
+| admin@erp.com    | Admin@Secure1   | ADMIN  |
+| medium@erp.com   | Medium@Secure1  | MEDIUM |
+| cesar@erp.com    | Cesar@Secure1   | BASE   |
+
+#### Guía de uso de la directiva `*hasRole`
+
+La directiva elimina el elemento del DOM si el usuario no tiene el rol requerido. No usa `display: none`.
+
+```html
+<!-- Acepta un rol único (string): -->
+<ng-container *hasRole="'admin'">
+  <p-button label="Eliminar" severity="danger" (onClick)="delete()" />
+</ng-container>
+
+<!-- Acepta un array de roles: -->
+<ng-container *hasRole="['admin', 'medium']">
+  <p-button label="Nuevo Ticket" icon="pi pi-plus" (onClick)="openCreate()" />
+</ng-container>
+
+<!-- Funciona sobre cualquier elemento o componente PrimeNG: -->
+<p-splitButton *hasRole="'admin'" label="Acciones" [model]="adminItems" />
+```
+
+Para importarla en un componente standalone:
+
+```typescript
+import { HasRoleDirective } from '../../directives/has-role.directive';
+
+@Component({
+  imports: [HasRoleDirective, ...],
+})
+```
+
+#### Catálogo de Errores (`ErrorHandlerService`)
+
+```typescript
+import { ErrorHandlerService, ERR } from '../../services/error-handler.service';
+
+// Inyección
+private readonly errorHandler = inject(ErrorHandlerService);
+
+// Uso con código del catálogo:
+this.errorHandler.dispatch(ERR.ERR_403_PERMISO);
+this.errorHandler.dispatch(ERR.ERR_500_GENERIC, 'Mensaje personalizado');
+
+// Atajos semánticos:
+this.errorHandler.dispatchPermissionError();
+this.errorHandler.dispatchSessionError();
+```
+
+| Código                | Severidad | Resumen               |
+|-----------------------|-----------|-----------------------|
+| `ERR_401_SESION`      | `warn`    | Sesión expirada       |
+| `ERR_403_PERMISO`     | `error`   | Acceso denegado       |
+| `ERR_404_RECURSO`     | `info`    | Recurso no encontrado |
+| `ERR_409_CONFLICTO`   | `warn`    | Conflicto de datos    |
+| `ERR_422_DATOS`       | `warn`    | Datos inválidos       |
+| `ERR_500_GENERIC`     | `error`   | Error inesperado      |
+
+#### `p-toast` global
+
+Se registra en `app.ts` (componente raíz) y `MessageService` en `app.config.ts`.
+Cualquier llamada a `ErrorHandlerService.dispatch()` aparece en toda la app sin configuración adicional por componente.
+
+#### Arquitectura actualizada
+
+```
+src/app/
+├── directives/
+│   └── has-role.directive.ts    ← NUEVO (TemplateRef + ViewContainerRef)
+├── models/
+│   ├── role.model.ts            ← NUEVO (AppRole, Permission, hasPermission)
+│   └── user.model.ts            ← role: AppRole (soporta 'medium')
+├── services/
+│   ├── permission.service.ts    ← NUEVO (can, hasRole)
+│   └── error-handler.service.ts ← NUEVO (catálogo ERR_xxx + toast auto)
+├── app.ts                       ← p-toast global
+├── app.config.ts                ← MessageService proveído globalmente
+├── pages/tickets/tickets.ts     ← PermissionService + ErrorHandlerService
+├── group/group.ts               ← PermissionService + ErrorHandlerService
+└── components/usuarios/usuarios.ts ← PermissionService + ErrorHandlerService
+```
+
+#### Git Commits
+
+```bash
+git add .
+git commit -m "feat: implement RBAC directive and global error handling"
+git push
+```

@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
+import { provideZonelessChangeDetection } from '@angular/core';
+import { provideRouter } from '@angular/router';
 import { AdminLayout } from './admin-layout';
 
 describe('AdminLayout', () => {
@@ -8,9 +9,9 @@ describe('AdminLayout', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [AdminLayout]
-    })
-    .compileComponents();
+      imports: [AdminLayout],
+      providers: [provideZonelessChangeDetection(), provideRouter([])],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(AdminLayout);
     component = fixture.componentInstance;

@@ -1,18 +1,19 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { GroupPage } from './group';
 
-import { Group } from './group';
-
-describe('Group', () => {
-  let component: Group;
-  let fixture: ComponentFixture<Group>;
+describe('GroupPage', () => {
+  let component: GroupPage;
+  let fixture: ComponentFixture<GroupPage>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [Group]
-    })
-    .compileComponents();
+      imports: [GroupPage],
+      providers: [provideZonelessChangeDetection(), provideRouter([])],
+    }).compileComponents();
 
-    fixture = TestBed.createComponent(Group);
+    fixture = TestBed.createComponent(GroupPage);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

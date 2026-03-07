@@ -22,19 +22,288 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* PrimeNG overrides globales */
-.p-button {
-  font-family: 'Inter', sans-serif !important;
+/* Scrollbar custom */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #111; }
+::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 3px; }
+
+/* ===== Global Utilities ===== */
+
+.cell-truncate {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Scrollbar custom */
-::-webkit-scrollbar {
-  width: 6px;
+.page-padding { padding: 1.5rem; }
+
+/* ===================================================
+   PrimeNG Dark Integration Overrides
+   Garantiza coherencia entre el layout oscuro y los
+   componentes PrimeNG (tabla, card, panel, dialog...)
+   =================================================== */
+
+/* ── p-table ── */
+.p-datatable .p-datatable-table-container {
+  border-radius: 10px;
+  overflow: hidden;
 }
-::-webkit-scrollbar-track {
-  background: #111;
+
+.p-datatable .p-datatable-header {
+  background: #181828 !important;
+  border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+  border-radius: 10px 10px 0 0;
+  padding: 0.85rem 1.1rem !important;
 }
-::-webkit-scrollbar-thumb {
-  background: #6366f1;
-  border-radius: 3px;
+
+.p-datatable-thead > tr > th {
+  background: #1a1a2e !important;
+  color: #a5b4fc !important;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+  padding: 0.7rem 1rem !important;
+}
+
+.p-datatable-tbody > tr {
+  background: #12121f !important;
+  color: #e5e7eb !important;
+  transition: background 0.15s ease;
+}
+
+.p-datatable-tbody > tr:nth-child(even) {
+  background: #15152a !important;
+}
+
+.p-datatable-tbody > tr:hover {
+  background: rgba(99,102,241,0.1) !important;
+}
+
+.p-datatable-tbody > tr > td {
+  border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+  color: #e5e7eb !important;
+  padding: 0.65rem 1rem !important;
+}
+
+.p-datatable .p-datatable-footer,
+.p-paginator {
+  background: #181828 !important;
+  color: #9ca3af !important;
+  border-top: 1px solid rgba(255,255,255,0.06) !important;
+  border-radius: 0 0 10px 10px;
+}
+
+.p-paginator .p-paginator-page.p-highlight {
+  background: #6366f1 !important;
+  color: #fff !important;
+}
+
+/* Sortable column icon */
+.p-sortable-column-icon { color: #6366f1 !important; }
+
+/* ── p-card ── */
+.p-card {
+  background: #181828 !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  border-radius: 14px !important;
+  color: #e5e7eb !important;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4) !important;
+}
+
+.p-card .p-card-title,
+.p-card .p-card-header {
+  color: #f9fafb !important;
+  font-weight: 700;
+}
+
+.p-card .p-card-subtitle {
+  color: #9ca3af !important;
+}
+
+/* ── p-panel ── */
+.p-panel {
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+.p-panel .p-panel-header {
+  background: #1a1a2e !important;
+  color: #e5e7eb !important;
+  border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+}
+
+.p-panel .p-panel-content {
+  background: #12121f !important;
+  color: #e5e7eb !important;
+}
+
+/* ── p-dialog ── */
+.p-dialog {
+  background: #1a1a2e !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.7) !important;
+}
+
+.p-dialog .p-dialog-header {
+  background: #1a1a2e !important;
+  color: #f9fafb !important;
+  border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+  border-radius: 14px 14px 0 0;
+}
+
+.p-dialog .p-dialog-content {
+  background: #181828 !important;
+  color: #e5e7eb !important;
+}
+
+.p-dialog .p-dialog-footer {
+  background: #181828 !important;
+  border-top: 1px solid rgba(255,255,255,0.07) !important;
+  border-radius: 0 0 14px 14px;
+}
+
+/* ── p-select / dropdown ── */
+.p-select,
+.p-select-dropdown {
+  background: #12121f !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: #e5e7eb !important;
+}
+
+.p-select-overlay {
+  background: #1a1a2e !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  color: #e5e7eb !important;
+}
+
+.p-select-option:hover,
+.p-select-option.p-focus {
+  background: rgba(99,102,241,0.15) !important;
+  color: #a5b4fc !important;
+}
+
+.p-select-option.p-selected {
+  background: rgba(99,102,241,0.25) !important;
+  color: #a5b4fc !important;
+}
+
+/* ── pInputText / pTextarea ── */
+.p-inputtext,
+textarea.p-inputtextarea {
+  background: #12121f !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: #e5e7eb !important;
+}
+
+.p-inputtext:focus,
+textarea.p-inputtextarea:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.25) !important;
+}
+
+.p-inputtext::placeholder,
+textarea.p-inputtextarea::placeholder {
+  color: #4b5563 !important;
+}
+
+/* ── p-datepicker ── */
+.p-datepicker-panel {
+  background: #1a1a2e !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  color: #e5e7eb !important;
+}
+
+/* ── p-divider ── */
+.p-divider-horizontal::before { border-color: rgba(255,255,255,0.08) !important; }
+.p-divider-vertical::before   { border-color: rgba(255,255,255,0.08) !important; }
+
+/* ── Column filter overlay ── */
+.p-column-filter-overlay {
+  background: #1a1a2e !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  color: #e5e7eb !important;
+}
+
+.p-column-filter-overlay .p-column-filter-buttonbar .p-button {
+  background: #6366f1 !important;
+  border-color: #6366f1 !important;
+}
+
+/* ── p-selectButton ── */
+.p-selectbutton .p-button {
+  background: #12121f !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: #9ca3af !important;
+}
+
+.p-selectbutton .p-button.p-highlight {
+  background: #6366f1 !important;
+  border-color: #6366f1 !important;
+  color: #fff !important;
+}
+
+/* ── p-tooltip ── */
+.p-tooltip .p-tooltip-text {
+  background: #1a1a2e !important;
+  color: #e5e7eb !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  font-size: 0.8rem;
+}
+
+/* ── p-toast ── */
+.p-toast .p-toast-message {
+  background: #1a1a2e !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  color: #e5e7eb !important;
+}
+
+/* ── p-confirmDialog ── */
+.p-confirmdialog .p-dialog-content {
+  background: #181828 !important;
+  color: #e5e7eb !important;
+}
+
+/* ── p-avatar ── */
+.p-avatar {
+  background: #6366f1 !important;
+  color: white !important;
+}
+
+/* ── p-timeline ── */
+.p-timeline .p-timeline-event-connector {
+  background: rgba(255,255,255,0.1) !important;
+}
+
+/* ============================================
+   Utilidades globales mínimas (sin Tailwind)
+   Prefijo u- para evitar colisiones.
+   Solo se definen los que son reutilizados
+   en más de un componente.
+   ============================================ */
+
+.u-semibold  { font-weight: 600; }
+.u-muted     { color: #9ca3af; }
+.u-center    { text-align: center; }
+.u-block     { display: block; }
+.u-text-xs   { font-size: 0.75rem; }
+.u-text-sm   { font-size: 0.875rem; }
+
+/* Empty-state para tablas (emptymessage) */
+.u-empty-icon {
+  display: block;
+  font-size: 2rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+.u-empty-text {
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+.u-empty-cell {
+  text-align: center;
+  padding: 1.5rem;
 }

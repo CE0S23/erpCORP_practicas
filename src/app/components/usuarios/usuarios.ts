@@ -1,4 +1,4 @@
-import { Component, inject, computed, signal } from '@angular/core';
+import { Component, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
@@ -9,7 +9,10 @@ import { ToastModule } from 'primeng/toast';
 import { TooltipModule } from 'primeng/tooltip';
 import { BreadcrumbModule } from 'primeng/breadcrumb';
 import { InputTextModule } from 'primeng/inputtext';
+import { HasRoleDirective } from '../../directives/has-role.directive';
 import { GroupService } from '../../services/group.service';
+import { ErrorHandlerService } from '../../services/error-handler.service';
+import { PermissionService } from '../../services/permission.service';
 import { APP_PATHS } from '../../app.paths';
 
 interface UsuarioRow {
@@ -27,7 +30,7 @@ interface UsuarioRow {
     standalone: true,
     providers: [MessageService],
     imports: [
-        CommonModule,
+    CommonModule,
         FormsModule,
         TableModule,
         TagModule,
@@ -36,6 +39,7 @@ interface UsuarioRow {
         TooltipModule,
         BreadcrumbModule,
         InputTextModule,
+        HasRoleDirective,
     ],
     templateUrl: './usuarios.html',
     styleUrl: './usuarios.css',
@@ -43,6 +47,8 @@ interface UsuarioRow {
 export class UsuariosPage {
     private readonly groupService = inject(GroupService);
     private readonly messageService = inject(MessageService);
+    private readonly errorHandler = inject(ErrorHandlerService);
+    readonly permissions = inject(PermissionService);
 
     readonly paths = APP_PATHS;
 
@@ -79,6 +85,10 @@ export class UsuariosPage {
         rol === 'admin' ? 'Administrador' : 'Editor';
 
     notifyEdit(usuario: UsuarioRow): void {
+        if (!this.permissions.can('edit')) {
+            this.errorHandler.dispatchPermissionError();
+            return;
+        }
         this.messageService.add({
             severity: 'info',
             summary: 'Editar usuario',
@@ -88,6 +98,10 @@ export class UsuariosPage {
     }
 
     notifyDelete(usuario: UsuarioRow): void {
+        if (!this.permissions.can('delete')) {
+            this.errorHandler.dispatchPermissionError();
+            return;
+        }
         this.messageService.add({
             severity: 'warn',
             summary: 'Eliminar usuario',

@@ -6,6 +6,9 @@ import { TicketService } from '../../services/ticket.service';
 import { TicketUtilsService } from '../../services/ticket-utils.service';
 import { GroupService } from '../../services/group.service';
 import { AuthService } from '../../services/auth.service';
+import { ErrorHandlerService } from '../../services/error-handler.service';
+import { PermissionService } from '../../services/permission.service';
+import { HasRoleDirective } from '../../directives/has-role.directive';
 import { Ticket, TicketStatus, TicketPriority } from '../../models/ticket.model';
 import { GroupMember } from '../../models/group.model';
 import { APP_PATHS } from '../../app.paths';
@@ -18,6 +21,7 @@ import { PRIMENG_MODULES } from '../../primeng';
     imports: [
         CommonModule,
         FormsModule,
+        HasRoleDirective,
         ...PRIMENG_MODULES,
     ],
     templateUrl: './tickets.html',
@@ -30,6 +34,8 @@ export class TicketsPage {
     private readonly authService = inject(AuthService);
     private readonly messageService = inject(MessageService);
     private readonly confirmationService = inject(ConfirmationService);
+    private readonly errorHandler = inject(ErrorHandlerService);
+    readonly permissions = inject(PermissionService);
     readonly utils = inject(TicketUtilsService);
 
     readonly tickets = this.ticketService.tickets;
@@ -93,6 +99,10 @@ export class TicketsPage {
     }
 
     openCreate(): void {
+        if (!this.permissions.can('create')) {
+            this.errorHandler.dispatchPermissionError();
+            return;
+        }
         this.draft = this.emptyDraft();
         this.editingId = null;
         this.submitted = false;
@@ -106,6 +116,10 @@ export class TicketsPage {
     }
 
     openEdit(ticket: Ticket): void {
+        if (!this.permissions.can('edit')) {
+            this.errorHandler.dispatchPermissionError();
+            return;
+        }
         this.draft = {
             titulo: ticket.titulo, descripcion: ticket.descripcion, status: ticket.status,
             priority: ticket.priority, assignedTo: ticket.assignedTo, assignedName: ticket.assignedName,
@@ -147,13 +161,17 @@ export class TicketsPage {
             this.submitted = false;
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : 'Error desconocido';
-            this.messageService.add({ severity: 'error', summary: 'Error de validación', detail: msg, life: 5000 });
+            this.errorHandler.dispatch('ERR_500_GENERIC', msg);
         } finally {
             this.isSaving.set(false);
         }
     }
 
     confirmDelete(ticket: Ticket): void {
+        if (!this.permissions.can('delete')) {
+            this.errorHandler.dispatchPermissionError();
+            return;
+        }
         this.confirmationService.confirm({
             message: `¿Eliminar "${ticket.titulo}"? Esta acción no se puede deshacer.`,
             header: 'Confirmar eliminación',

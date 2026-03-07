@@ -70,7 +70,12 @@ import { APP_PATHS } from '../../app.paths';
               <code>Admin&#64;Secure1</code>
             </div>
             <div class="hint-row">
-              <span class="hint-badge user">USER</span>
+              <span class="hint-badge medium">MEDIUM</span>
+              <code>medium&#64;erp.com</code>
+              <code>Medium&#64;Secure1</code>
+            </div>
+            <div class="hint-row">
+              <span class="hint-badge user">BASE</span>
               <code>cesar&#64;erp.com</code>
               <code>Cesar&#64;Secure1</code>
             </div>
@@ -137,6 +142,7 @@ import { APP_PATHS } from '../../app.paths';
     .hint-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; flex-wrap: wrap; }
     .hint-badge { font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; text-transform: uppercase; }
     .hint-badge.admin { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+    .hint-badge.medium { background: rgba(139,92,246,0.15); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.3); }
     .hint-badge.user  { background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); }
     .hint-row code { font-size: 0.78rem; color: #d1d5db; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 5px; }
 

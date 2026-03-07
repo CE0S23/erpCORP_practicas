@@ -3,8 +3,6 @@
 
 <div class="tickets-page">
 
-  <p-breadcrumb [model]="breadcrumbItems" [home]="breadcrumbHome" styleClass="mb-3" />
-
   <p-table
     [value]="tickets()"
     [paginator]="true"
@@ -16,15 +14,17 @@
     #dt
   >
     <ng-template pTemplate="caption">
-      <div class="flex align-items-center justify-content-between flex-wrap gap-2">
-        <span class="text-xl font-bold">Tickets</span>
-        <div class="flex gap-2 align-items-center">
+      <div class="table-caption">
+        <span class="table-title">Tickets</span>
+        <div class="table-actions">
           <span class="p-input-icon-left">
             <i class="pi pi-search"></i>
             <input pInputText type="text" (input)="dt.filterGlobal($any($event.target).value, 'contains')" placeholder="Buscar ticket..." />
           </span>
           <p-button label="Exportar CSV" icon="pi pi-download" severity="secondary" [outlined]="true" (onClick)="dt.exportCSV()" />
-          <p-button label="Nuevo Ticket" icon="pi pi-plus" (onClick)="openCreate()" />
+          <ng-container *hasRole="['admin', 'medium']">
+            <p-button label="Nuevo Ticket" icon="pi pi-plus" (onClick)="openCreate()" />
+          </ng-container>
         </div>
       </div>
     </ng-template>
@@ -66,10 +66,14 @@
         <td>{{ ticket.createdAt | date:'dd/MM/yy' }}</td>
         <td>{{ ticket.dueDate | date:'dd/MM/yy' }}</td>
         <td>
-          <div class="flex gap-1">
+          <div class="row-actions">
             <p-button icon="pi pi-eye" [text]="true" [rounded]="true" severity="info" (onClick)="openDetail(ticket)" pTooltip="Ver detalle" />
-            <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" severity="warn" (onClick)="openEdit(ticket)" pTooltip="Editar" />
-            <p-button icon="pi pi-trash" [text]="true" [rounded]="true" severity="danger" (onClick)="confirmDelete(ticket)" pTooltip="Eliminar" />
+            <ng-container *hasRole="['admin', 'medium']">
+              <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" severity="warn" (onClick)="openEdit(ticket)" pTooltip="Editar" />
+            </ng-container>
+            <ng-container *hasRole="'admin'">
+              <p-button icon="pi pi-trash" [text]="true" [rounded]="true" severity="danger" (onClick)="confirmDelete(ticket)" pTooltip="Eliminar" />
+            </ng-container>
           </div>
         </td>
       </tr>
@@ -77,9 +81,9 @@
 
     <ng-template pTemplate="emptymessage">
       <tr>
-        <td colspan="8" class="text-center p-4">
-          <i class="pi pi-inbox text-4xl text-300 block mb-2"></i>
-          <span class="text-500">No hay tickets registrados</span>
+        <td colspan="8" class="u-empty-cell">
+          <i class="pi pi-inbox u-empty-icon"></i>
+          <span class="u-empty-text">No hay tickets registrados</span>
         </td>
       </tr>
     </ng-template>
@@ -89,61 +93,63 @@
 <!-- ── MODAL DETALLE ── -->
 <p-dialog header="Detalle del Ticket" [(visible)]="detailVisible" [modal]="true" [style]="{ width: '640px' }" [draggable]="false">
   @if (selectedTicket) {
-  <div class="flex flex-column gap-3">
-    <div class="flex align-items-center gap-2">
+  <div class="detail-body">
+    <div class="detail-tags">
       <p-tag [value]="selectedTicket.status" [severity]="statusSeverity(selectedTicket.status)" />
       <p-tag [value]="selectedTicket.priority" [severity]="prioritySeverity(selectedTicket.priority)" />
-      <span class="text-500 text-sm">{{ selectedTicket.groupName }}</span>
+      <span class="detail-group">{{ selectedTicket.groupName }}</span>
     </div>
-    <h2 class="m-0 text-xl">{{ selectedTicket.titulo }}</h2>
-    <p class="m-0 line-height-3">{{ selectedTicket.descripcion }}</p>
-    <div class="grid">
-      <div class="col-6">
-        <span class="block text-500 text-xs uppercase mb-1">Asignado a</span>
-        <span class="font-semibold">{{ selectedTicket.assignedName }}</span>
+    <h2 class="detail-title">{{ selectedTicket.titulo }}</h2>
+    <p class="detail-desc">{{ selectedTicket.descripcion }}</p>
+    <div class="detail-meta">
+      <div class="detail-meta__item">
+        <span class="detail-meta__label">Asignado a</span>
+        <span class="detail-meta__value">{{ selectedTicket.assignedName }}</span>
       </div>
-      <div class="col-3">
-        <span class="block text-500 text-xs uppercase mb-1">Creado</span>
-        <span>{{ selectedTicket.createdAt | date:'dd/MM/yyyy' }}</span>
+      <div class="detail-meta__item">
+        <span class="detail-meta__label">Creado</span>
+        <span class="detail-meta__value">{{ selectedTicket.createdAt | date:'dd/MM/yyyy' }}</span>
       </div>
-      <div class="col-3">
-        <span class="block text-500 text-xs uppercase mb-1">Fecha Límite</span>
-        <span>{{ selectedTicket.dueDate | date:'dd/MM/yyyy' }}</span>
+      <div class="detail-meta__item">
+        <span class="detail-meta__label">Fecha Límite</span>
+        <span class="detail-meta__value">{{ selectedTicket.dueDate | date:'dd/MM/yyyy' }}</span>
       </div>
     </div>
     <p-divider />
     @if (selectedTicket.comments.length > 0) {
-    <div>
-      <span class="block font-semibold mb-2"><i class="pi pi-comments mr-1"></i> Comentarios</span>
+    <div class="detail-section">
+      <span class="detail-section__title"><i class="pi pi-comments"></i> Comentarios</span>
       @for (comment of selectedTicket.comments; track comment.id) {
-      <div class="border-round surface-100 p-3 mb-2">
-        <div class="flex justify-content-between mb-1">
-          <span class="font-semibold text-sm">{{ comment.author }}</span>
-          <span class="text-500 text-xs">{{ comment.date | date:'dd/MM/yyyy HH:mm' }}</span>
+      <div class="comment-card">
+        <div class="comment-card__header">
+          <span class="comment-author">{{ comment.author }}</span>
+          <span class="comment-date">{{ comment.date | date:'dd/MM/yyyy HH:mm' }}</span>
         </div>
-        <p class="m-0 text-sm">{{ comment.text }}</p>
+        <p class="comment-text">{{ comment.text }}</p>
       </div>
       }
     </div>
     }
     @if (selectedTicket.history.length > 0) {
-    <div>
-      <span class="block font-semibold mb-2"><i class="pi pi-history mr-1"></i> Historial de cambios</span>
-      <p-timeline [value]="selectedTicket.history" styleClass="text-sm">
+    <div class="detail-section">
+      <span class="detail-section__title"><i class="pi pi-history"></i> Historial de cambios</span>
+      <p-timeline [value]="selectedTicket.history">
         <ng-template pTemplate="content" let-entry>
-          <span class="text-500 text-xs">{{ entry.changedBy }} cambió <strong>{{ entry.field }}</strong>:
-            <span class="text-red-400">{{ entry.oldValue }}</span> → <span class="text-green-500">{{ entry.newValue }}</span>
+          <span class="history-entry">{{ entry.changedBy }} cambió <strong>{{ entry.field }}</strong>:
+            <span class="history-old">{{ entry.oldValue }}</span> → <span class="history-new">{{ entry.newValue }}</span>
           </span>
         </ng-template>
         <ng-template pTemplate="opposite" let-entry>
-          <span class="text-300 text-xs">{{ entry.date | date:'dd/MM HH:mm' }}</span>
+          <span class="history-date">{{ entry.date | date:'dd/MM HH:mm' }}</span>
         </ng-template>
       </p-timeline>
     </div>
     }
   </div>
   <ng-template pTemplate="footer">
-    <p-button label="Editar" icon="pi pi-pencil" (onClick)="openEdit(selectedTicket!)" />
+    <ng-container *hasRole="['admin', 'medium']">
+      <p-button label="Editar" icon="pi pi-pencil" (onClick)="openEdit(selectedTicket!)" />
+    </ng-container>
     <p-button label="Cerrar" icon="pi pi-times" [text]="true" (onClick)="detailVisible = false" />
   </ng-template>
   }
@@ -161,95 +167,57 @@
 >
   <div class="ticket-form">
 
-    <!-- Título -->
     <div class="form-field" [class.field-error]="submitted && !draft.titulo.trim()">
-      <label class="form-label">
-        Título <span class="required-star">*</span>
-      </label>
-      <input
-        pInputText
-        [(ngModel)]="draft.titulo"
-        placeholder="Ej. Configurar CI/CD"
-        class="w-full"
-        [class.ng-invalid]="submitted && !draft.titulo.trim()"
-      />
+      <label class="form-label">Título <span class="required-star">*</span></label>
+      <input pInputText [(ngModel)]="draft.titulo" placeholder="Ej. Configurar CI/CD"
+        [class.ng-invalid]="submitted && !draft.titulo.trim()" />
       @if (submitted && !draft.titulo.trim()) {
-        <small class="error-msg"><i class="pi pi-exclamation-circle mr-1"></i>El título es obligatorio</small>
+        <small class="error-msg"><i class="pi pi-exclamation-circle"></i> El título es obligatorio</small>
       }
     </div>
 
-    <!-- Descripción -->
     <div class="form-field">
       <label class="form-label">Descripción</label>
-      <textarea
-        pTextarea
-        [(ngModel)]="draft.descripcion"
-        rows="3"
-        placeholder="Describe el problema o tarea con detalle..."
-        class="w-full"
-      ></textarea>
+      <textarea pTextarea [(ngModel)]="draft.descripcion" rows="3" placeholder="Describe el problema o tarea con detalle..."></textarea>
     </div>
 
-    <!-- Estado + Prioridad -->
     <div class="form-row">
       <div class="form-field">
         <label class="form-label">Estado <span class="required-star">*</span></label>
-        <p-select [options]="statusOptions" [(ngModel)]="draft.status" placeholder="Seleccionar" class="w-full" />
+        <p-select [options]="statusOptions" [(ngModel)]="draft.status" placeholder="Seleccionar" />
       </div>
       <div class="form-field">
         <label class="form-label">Prioridad <span class="required-star">*</span></label>
-        <p-select [options]="priorityOptions" [(ngModel)]="draft.priority" placeholder="Seleccionar" class="w-full" />
+        <p-select [options]="priorityOptions" [(ngModel)]="draft.priority" placeholder="Seleccionar" />
       </div>
     </div>
 
-    <!-- Grupo -->
     <div class="form-field" [class.field-error]="submitted && !draft.groupId">
-      <label class="form-label">
-        Grupo <span class="required-star">*</span>
-      </label>
-      <p-select
-        [options]="groupOptions()"
-        [(ngModel)]="draft.groupId"
-        (onChange)="onGroupChange()"
-        placeholder="Seleccionar grupo"
-        class="w-full"
-        [class.ng-invalid]="submitted && !draft.groupId"
-      />
+      <label class="form-label">Grupo <span class="required-star">*</span></label>
+      <p-select [options]="groupOptions()" [(ngModel)]="draft.groupId" (onChange)="onGroupChange()"
+        placeholder="Seleccionar grupo" [class.ng-invalid]="submitted && !draft.groupId" />
       @if (submitted && !draft.groupId) {
-        <small class="error-msg"><i class="pi pi-exclamation-circle mr-1"></i>Selecciona un grupo</small>
+        <small class="error-msg"><i class="pi pi-exclamation-circle"></i> Selecciona un grupo</small>
       }
     </div>
 
-    <!-- Asignado a -->
     <div class="form-field">
-      <label class="form-label">
-        Asignado a
-        <span class="form-hint">(solo miembros del grupo seleccionado)</span>
-      </label>
-      <p-select
-        [options]="memberOptions()"
-        [(ngModel)]="draft.assignedTo"
-        (onChange)="onMemberChange()"
-        placeholder="Seleccionar miembro"
-        [disabled]="!draft.groupId"
-        class="w-full"
-      />
+      <label class="form-label">Asignado a <span class="form-hint">(solo miembros del grupo)</span></label>
+      <p-select [options]="memberOptions()" [(ngModel)]="draft.assignedTo" (onChange)="onMemberChange()"
+        placeholder="Seleccionar miembro" [disabled]="!draft.groupId" />
       @if (!draft.groupId) {
         <small class="form-hint-msg">Selecciona un grupo primero</small>
       }
     </div>
 
-    <!-- Fechas -->
     <div class="form-row">
       <div class="form-field">
         <label class="form-label">Fecha de Creación</label>
-        <p-datepicker [(ngModel)]="draft.createdAt" dateFormat="dd/mm/yy" [showIcon]="true" class="w-full" />
+        <p-datepicker [(ngModel)]="draft.createdAt" dateFormat="dd/mm/yy" [showIcon]="true" />
       </div>
       <div class="form-field">
-        <label class="form-label">
-          Fecha Límite <span class="required-star">*</span>
-        </label>
-        <p-datepicker [(ngModel)]="draft.dueDate" dateFormat="dd/mm/yy" [showIcon]="true" class="w-full" />
+        <label class="form-label">Fecha Límite <span class="required-star">*</span></label>
+        <p-datepicker [(ngModel)]="draft.dueDate" dateFormat="dd/mm/yy" [showIcon]="true" />
       </div>
     </div>
 

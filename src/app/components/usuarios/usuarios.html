@@ -1,8 +1,6 @@
 <p-toast position="top-right" />
 
 <div class="usuarios-page">
-  <p-breadcrumb [model]="breadcrumbItems" [home]="breadcrumbHome" styleClass="mb-4" />
-
   <div class="usuarios-header">
     <div>
       <h1 class="usuarios-title">Usuarios</h1>
@@ -24,7 +22,7 @@
     #dt
   >
     <ng-template pTemplate="caption">
-      <div class="flex align-items-center gap-2">
+      <div class="table-caption">
         <span class="p-input-icon-left">
           <i class="pi pi-search"></i>
           <input
@@ -59,7 +57,7 @@
     <ng-template pTemplate="body" let-usuario>
       <tr>
         <td>
-          <span class="font-semibold">{{ usuario.nombre }}</span>
+          <span class="u-semibold">{{ usuario.nombre }}</span>
         </td>
         <td>
           <span class="cell-truncate" style="max-width: 8rem" [pTooltip]="usuario.grupo">
@@ -70,7 +68,7 @@
           <p-tag [value]="rolLabel(usuario.rol)" [severity]="rolSeverity(usuario.rol)" />
         </td>
         <td>
-          <span class="cell-truncate text-color-secondary" style="max-width: 11rem" [pTooltip]="usuario.correo">
+          <span class="cell-truncate" style="max-width: 11rem" [pTooltip]="usuario.correo">
             {{ usuario.correo }}
           </span>
         </td>
@@ -78,23 +76,27 @@
           <p-tag value="Activo" severity="success" />
         </td>
         <td>
-          <div class="flex gap-1">
-            <p-button
-              icon="pi pi-pencil"
-              [text]="true"
-              [rounded]="true"
-              severity="warn"
-              (onClick)="notifyEdit(usuario)"
-              pTooltip="Editar"
-            />
-            <p-button
-              icon="pi pi-trash"
-              [text]="true"
-              [rounded]="true"
-              severity="danger"
-              (onClick)="notifyDelete(usuario)"
-              pTooltip="Eliminar"
-            />
+          <div class="row-actions">
+            <ng-container *hasRole="['admin', 'medium']">
+              <p-button
+                icon="pi pi-pencil"
+                [text]="true"
+                [rounded]="true"
+                severity="warn"
+                (onClick)="notifyEdit(usuario)"
+                pTooltip="Editar"
+              />
+            </ng-container>
+            <ng-container *hasRole="'admin'">
+              <p-button
+                icon="pi pi-trash"
+                [text]="true"
+                [rounded]="true"
+                severity="danger"
+                (onClick)="notifyDelete(usuario)"
+                pTooltip="Eliminar"
+              />
+            </ng-container>
           </div>
         </td>
       </tr>
@@ -102,9 +104,9 @@
 
     <ng-template pTemplate="emptymessage">
       <tr>
-        <td colspan="6" class="text-center p-4">
-          <i class="pi pi-users text-4xl text-300 block mb-2"></i>
-          <span class="text-500">No hay usuarios registrados</span>
+        <td colspan="6" class="u-empty-cell">
+          <i class="pi pi-users u-empty-icon"></i>
+          <span class="u-empty-text">No hay usuarios registrados</span>
         </td>
       </tr>
     </ng-template>

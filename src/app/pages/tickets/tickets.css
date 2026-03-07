@@ -2,14 +2,136 @@
   padding: 1.5rem;
 }
 
-.cell-truncate {
-  display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* ── Table caption ── */
+.table-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
-/* ── Formulario del modal ── */
+.table-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ── Row actions ── */
+.row-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+/* ── Detail dialog ── */
+.detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detail-tags {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.detail-group {
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
+
+.detail-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.detail-desc {
+  margin: 0;
+  color: #d1d5db;
+  line-height: 1.6;
+}
+
+.detail-meta {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.detail-meta__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-meta__label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+}
+
+.detail-meta__value {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.detail-section__title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* ── Comments ── */
+.comment-card {
+  background: rgba(255,255,255,0.04);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.comment-card__header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.comment-author {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.comment-date {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.comment-text {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #d1d5db;
+}
+
+/* ── History ── */
+.history-entry { font-size: 0.8rem; color: #9ca3af; }
+.history-old   { color: #f87171; }
+.history-new   { color: #4ade80; }
+.history-date  { font-size: 0.75rem; color: #6b7280; }
+
+/* ── Ticket form (modal crear/editar) ── */
 .ticket-form {
   display: flex;
   flex-direction: column;
@@ -32,48 +154,32 @@
 .form-label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--p-text-color);
+  color: #e5e7eb;
 }
 
-.required-star {
-  color: var(--p-red-400, #f87171);
-  margin-left: 2px;
-}
+.required-star { color: #f87171; margin-left: 2px; }
 
 .form-hint {
   font-size: 0.75rem;
   font-weight: 400;
-  color: var(--p-text-muted-color);
+  color: #9ca3af;
   margin-left: 4px;
 }
 
-.form-hint-msg {
-  font-size: 0.75rem;
-  color: var(--p-text-muted-color);
-}
-
-.field-error input,
-.field-error .p-select {
-  border-color: var(--p-red-400, #f87171) !important;
-}
+.form-hint-msg { font-size: 0.75rem; color: #9ca3af; }
 
 .error-msg {
   font-size: 0.75rem;
-  color: var(--p-red-400, #f87171);
+  color: #f87171;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
-/* ── Footer del diálogo ── */
+/* ── Dialog footer ── */
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
   width: 100%;
-}
-
-:host ::ng-deep .ticket-form-dialog .save-btn {
-  font-weight: 700;
-  letter-spacing: 0.3px;
 }

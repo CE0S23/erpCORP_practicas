@@ -50,12 +50,12 @@
   margin: 0;
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--p-text-color);
+  color: #f9fafb;
 }
 
 .identity-username {
   font-size: 0.875rem;
-  color: var(--p-text-muted-color);
+  color: #9ca3af;
 }
 
 /* Meta rows */
@@ -70,11 +70,11 @@
   align-items: center;
   gap: 0.75rem;
   font-size: 0.9rem;
-  color: var(--p-text-color);
+  color: #e5e7eb;
 }
 
 .meta-icon {
-  color: var(--p-primary-color);
+  color: #818cf8;
   width: 1rem;
   flex-shrink: 0;
 }
@@ -97,15 +97,16 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
+  color: #e5e7eb;
 }
 
 .setting-icon {
-  color: var(--p-primary-color);
+  color: #818cf8;
 }
 
 .setting-value {
   font-size: 0.85rem;
-  color: var(--p-text-muted-color);
+  color: #9ca3af;
   font-weight: 500;
 }
 
@@ -124,12 +125,13 @@
 
 .stat-label {
   font-size: 0.875rem;
-  color: var(--p-text-muted-color);
+  color: #9ca3af;
 }
 
 .stat-value {
   font-size: 0.8rem;
   font-family: monospace;
+  color: #e5e7eb;
 }
 
 @media (max-width: 768px) {
@@ -145,3 +147,23 @@
     grid-row: auto;
   }
 }
+
+/* Reemplazo de styleClass Tailwind en componentes PrimeNG */
+.identity-role-tag {
+  margin-top: 0.5rem;
+}
+
+.meta-row__end {
+  margin-left: auto;
+}
+
+.settings-edit-btn {
+  margin-top: 0.75rem;
+  width: 100%;
+}
+
+.settings-edit-btn ::ng-deep .p-button {
+  width: 100%;
+  justify-content: center;
+}
+

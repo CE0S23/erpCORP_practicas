@@ -1,9 +1,11 @@
+import { AppRole } from './role.model';
+
 export interface User {
     id: string;
     username: string;
     name: string;
     email: string;
-    role: 'admin' | 'user';
+    role: AppRole;
 }
 
 export interface LoginRequest {

@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-
+import { provideZonelessChangeDetection } from '@angular/core';
 import { CustomInput } from './custom-input';
 
 describe('CustomInput', () => {
@@ -8,9 +8,9 @@ describe('CustomInput', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [CustomInput]
-    })
-    .compileComponents();
+      imports: [CustomInput],
+      providers: [provideZonelessChangeDetection()],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(CustomInput);
     component = fixture.componentInstance;

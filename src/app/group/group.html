@@ -1,129 +1,250 @@
-<p-toast position="top-right" />
+<p-toast position="top-center" [breakpoints]="{'920px': {width: '100%', right: '0', left: '0'}}" />
 <p-confirmDialog />
 
-<div class="group-page">
+<div class="group-page page-padding">
 
-    <!-- Stats row -->
-    <div class="stats-row">
-        <div class="stat-card">
-            <i class="pi pi-users stat-icon"></i>
-            <div class="stat-info">
-                <span class="stat-value">{{ totalGroups() }}</span>
-                <span class="stat-label">Grupos</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <i class="pi pi-user stat-icon accent-green"></i>
-            <div class="stat-info">
-                <span class="stat-value">{{ totalMembers() }}</span>
-                <span class="stat-label">Miembros</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <i class="pi pi-ticket stat-icon accent-amber"></i>
-            <div class="stat-info">
-                <span class="stat-value">{{ totalTickets() }}</span>
-                <span class="stat-label">Tickets</span>
-            </div>
-        </div>
+  <!-- Stats row -->
+  <div class="stats-row">
+    <div class="stat-chip"><i class="pi pi-users"></i><strong>{{ totalGroups() }}</strong><span>grupos</span></div>
+    <div class="stat-chip stat-chip--members"><i class="pi pi-user"></i><strong>{{ totalMembers() }}</strong><span>miembros</span></div>
+    <div class="stat-chip stat-chip--tickets"><i class="pi pi-ticket"></i><strong>{{ totalTickets() }}</strong><span>tickets</span></div>
+  </div>
+
+  <!-- Groups Table -->
+  <p-table [value]="groups()" [paginator]="true" [rows]="8" [rowsPerPageOptions]="[5, 8, 15]"
+    dataKey="id" styleClass="p-datatable-sm p-datatable-striped">
+    <ng-template pTemplate="caption">
+      <div class="table-caption">
+        <span class="table-title">Grupos</span>
+        <ng-container *hasRole="['admin', 'medium']">
+          <p-button label="Nuevo Grupo" icon="pi pi-plus" (onClick)="openCreate()" />
+        </ng-container>
+      </div>
+    </ng-template>
+
+    <ng-template pTemplate="header">
+      <tr>
+        <th pSortableColumn="id">ID <p-sortIcon field="id" /></th>
+        <th pSortableColumn="nombre">Nombre <p-sortIcon field="nombre" /></th>
+        <th pSortableColumn="categoria">Categoría <p-sortIcon field="categoria" /></th>
+        <th pSortableColumn="nivel">Nivel <p-sortIcon field="nivel" /></th>
+        <th pSortableColumn="autor">Autor <p-sortIcon field="autor" /></th>
+        <th pSortableColumn="miembros">Miembros <p-sortIcon field="miembros" /></th>
+        <th pSortableColumn="tickets">Tickets <p-sortIcon field="tickets" /></th>
+        <th>Acciones</th>
+      </tr>
+    </ng-template>
+
+    <ng-template pTemplate="body" let-group>
+      <tr [class.selected-row]="selectedGroup()?.id === group.id" (click)="selectGroup(group)" style="cursor:pointer">
+        <td><code class="group-id">{{ group.id }}</code></td>
+        <td>
+          <span class="cell-truncate u-semibold" style="max-width:130px" [pTooltip]="group.nombre">{{ group.nombre }}</span>
+        </td>
+        <td>
+          <span class="cell-truncate" style="max-width:100px" [pTooltip]="group.categoria">{{ group.categoria }}</span>
+        </td>
+        <td><p-tag [value]="group.nivel" [severity]="levelSeverity(group.nivel)" /></td>
+        <td>
+          <span class="cell-truncate" style="max-width:100px" [pTooltip]="group.autor">{{ group.autor }}</span>
+        </td>
+        <td>{{ group.miembros }}</td>
+        <td>{{ group.tickets }}</td>
+        <td (click)="$event.stopPropagation()">
+          <div class="row-actions">
+            <ng-container *hasRole="['admin', 'medium']">
+              <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" severity="info" (onClick)="openEdit(group)" pTooltip="Editar" />
+            </ng-container>
+            <ng-container *hasRole="'admin'">
+              <p-button icon="pi pi-trash" [text]="true" [rounded]="true" severity="danger" (onClick)="confirmDelete(group)" pTooltip="Eliminar" />
+            </ng-container>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="8" class="u-empty-cell">
+          <i class="pi pi-inbox u-empty-icon"></i>
+          <span class="u-empty-text">Sin grupos registrados</span>
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+
+  <!-- ===== Group detail panel ===== -->
+  @if (selectedGroup()) {
+  <div class="group-detail">
+
+    <div class="detail-header">
+      <div>
+        <h2 class="detail-title">{{ selectedGroup()!.nombre }}</h2>
+        <span class="detail-subtitle">{{ selectedGroup()!.categoria }} · {{ selectedGroup()!.nivel }}</span>
+      </div>
+      <p-selectButton [options]="viewModeOptions" [(ngModel)]="viewMode" optionLabel="label" optionValue="value" />
     </div>
 
-    <!-- Table card -->
-    <p-table [value]="groups()" [paginator]="true" [rows]="8" [rowsPerPageOptions]="[5, 8, 15]" dataKey="id"
-        styleClass="p-datatable-sm">
-        <ng-template pTemplate="caption">
-            <div class="table-caption">
-                <span class="table-title">Grupos</span>
-                <p-button label="Nuevo Grupo" icon="pi pi-plus" (onClick)="openCreate()" />
+    <!-- ===== KANBAN VIEW ===== -->
+    @if (viewMode() === 'kanban') {
+    <div class="kanban-board" cdkDropListGroup>
+      @for (status of kanbanStatuses; track status) {
+      <div class="kanban-column">
+        <div class="kanban-column__header">
+          <p-tag [value]="status" [severity]="statusSeverity(status)" />
+          <span class="kanban-count">({{ (ticketsByStatus()[status] || []).length }})</span>
+        </div>
+        <div
+          class="kanban-column__body"
+          cdkDropList
+          [cdkDropListData]="ticketsByStatus()[status] || []"
+          [id]="'kanban-' + status"
+          (cdkDropListDropped)="dropTicket($event, status)"
+        >
+          @for (ticket of ticketsByStatus()[status] || []; track ticket.id) {
+          <div class="kanban-card" cdkDrag [cdkDragData]="ticket">
+            <!-- Drag preview placeholder -->
+            <div class="kanban-card-placeholder" *cdkDragPlaceholder></div>
+
+            <div class="kanban-card__meta">
+              <p-tag [value]="ticket.priority" [severity]="prioritySeverity(ticket.priority)" />
+              <i [class]="priorityIcon(ticket.priority)"></i>
             </div>
-        </ng-template>
+            <p class="kanban-card__title" [pTooltip]="ticket.titulo" tooltipPosition="top">{{ ticket.titulo }}</p>
+            <p class="kanban-card__desc" [pTooltip]="ticket.descripcion">{{ ticket.descripcion }}</p>
+            <div class="kanban-card__footer">
+              <span>{{ ticket.assignedName }}</span>
+              <span>{{ ticket.dueDate | date:'dd/MM' }}</span>
+            </div>
+          </div>
+          }
 
-        <ng-template pTemplate="header">
-            <tr>
-                <th pSortableColumn="id">ID <p-sortIcon field="id" /></th>
-                <th pSortableColumn="nombre">Nombre <p-sortIcon field="nombre" /></th>
-                <th pSortableColumn="categoria">Categoría <p-sortIcon field="categoria" /></th>
-                <th pSortableColumn="nivel">Nivel <p-sortIcon field="nivel" /></th>
-                <th pSortableColumn="autor">Autor <p-sortIcon field="autor" /></th>
-                <th pSortableColumn="miembros">Miembros <p-sortIcon field="miembros" /></th>
-                <th pSortableColumn="tickets">Tickets <p-sortIcon field="tickets" /></th>
-                <th>Acciones</th>
-            </tr>
-        </ng-template>
+          @if ((ticketsByStatus()[status] || []).length === 0) {
+          <div class="kanban-empty">Sin tickets</div>
+          }
+        </div>
+      </div>
+      }
+    </div>
+    }
 
-        <ng-template pTemplate="body" let-group>
-            <tr>
-                <td><code class="id-cell">{{ group.id }}</code></td>
-                <td><strong>{{ group.nombre }}</strong></td>
-                <td>{{ group.categoria }}</td>
-                <td>
-                    <p-tag [value]="group.nivel" [severity]="levelSeverity(group.nivel)" />
-                </td>
-                <td>{{ group.autor }}</td>
-                <td>{{ group.miembros }}</td>
-                <td>{{ group.tickets }}</td>
-                <td>
-                    <div class="action-buttons">
-                        <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" severity="info"
-                            (onClick)="openEdit(group)" pTooltip="Editar" />
-                        <p-button icon="pi pi-trash" [text]="true" [rounded]="true" severity="danger"
-                            (onClick)="confirmDelete(group)" pTooltip="Eliminar" />
-                    </div>
-                </td>
-            </tr>
-        </ng-template>
-
-        <ng-template pTemplate="emptymessage">
-            <tr>
-                <td colspan="8" class="empty-msg">
-                    <i class="pi pi-inbox"></i> Sin grupos registrados
-                </td>
-            </tr>
-        </ng-template>
+    <!-- ===== LIST VIEW ===== -->
+    @if (viewMode() === 'list') {
+    <p-table
+      [value]="groupTicketsList()"
+      [paginator]="true"
+      [rows]="8"
+      styleClass="p-datatable-sm p-datatable-striped"
+      #dtGroup
+    >
+      <ng-template pTemplate="caption">
+        <div class="list-export">
+          <p-button label="Exportar CSV" icon="pi pi-download" severity="secondary" [outlined]="true" size="small" (onClick)="dtGroup.exportCSV()" />
+        </div>
+      </ng-template>
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="titulo" style="min-width:13rem">Título <p-sortIcon field="titulo" /></th>
+          <th pSortableColumn="status">Estado <p-sortIcon field="status" /></th>
+          <th pSortableColumn="priority">Prioridad <p-sortIcon field="priority" /></th>
+          <th pSortableColumn="assignedName">Asignado <p-sortIcon field="assignedName" /></th>
+          <th pSortableColumn="createdAt">FC <p-sortIcon field="createdAt" /></th>
+          <th pSortableColumn="dueDate">FL <p-sortIcon field="dueDate" /></th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-ticket>
+        <tr>
+          <td><span class="cell-truncate" style="max-width:12rem" [pTooltip]="ticket.titulo">{{ ticket.titulo }}</span></td>
+          <td><p-tag [value]="ticket.status" [severity]="statusSeverity(ticket.status)" /></td>
+          <td><p-tag [value]="ticket.priority" [severity]="prioritySeverity(ticket.priority)" /></td>
+          <td><span class="cell-truncate" style="max-width:8rem" [pTooltip]="ticket.assignedName">{{ ticket.assignedName }}</span></td>
+          <td>{{ ticket.createdAt | date:'dd/MM/yy' }}</td>
+          <td>{{ ticket.dueDate | date:'dd/MM/yy' }}</td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="6" class="u-empty-cell u-empty-text">Sin tickets para este grupo</td>
+        </tr>
+      </ng-template>
     </p-table>
+    }
+
+    <!-- ===== MEMBER MANAGEMENT ===== -->
+    <p-panel header="Gestión de Miembros" [toggleable]="true">
+      <div class="add-member-row">
+        <div class="add-member-input">
+          <label class="form-label">Añadir miembro por email</label>
+          <input pInputText [(ngModel)]="newMemberEmail" placeholder="usuario@empresa.com"
+            (keydown.enter)="addMember()" />
+        </div>
+        <p-button label="Añadir" icon="pi pi-user-plus" (onClick)="addMember()" />
+      </div>
+
+      <div class="member-list">
+        @for (member of memberList(); track member.id) {
+        <div class="member-item">
+          <div class="member-avatar">{{ member.name.charAt(0).toUpperCase() }}</div>
+          <div class="member-info">
+            <span class="member-name">{{ member.name }}</span>
+            <span class="member-email u-muted u-text-xs">{{ member.email }}</span>
+          </div>
+          <p-tag [value]="member.role" [severity]="member.role === 'admin' ? 'danger' : 'secondary'" />
+          <p-button icon="pi pi-times" [text]="true" [rounded]="true" severity="danger" size="small"
+            (onClick)="removeMember(member)" pTooltip="Eliminar miembro" />
+        </div>
+        }
+        @if (memberList().length === 0) {
+        <div class="u-empty-cell u-empty-text">Sin miembros en este grupo</div>
+        }
+      </div>
+    </p-panel>
+
+  </div>
+  } @else {
+  <div class="select-prompt">
+    <i class="pi pi-arrow-up select-prompt__icon"></i>
+    <p class="u-muted">Selecciona un grupo de la tabla para ver su vista Kanban / Lista y gestionar sus miembros</p>
+  </div>
+  }
+
 </div>
 
-<!-- Dialog Crear / Editar -->
+<!-- ====== CRUD DIALOG ====== -->
 <p-dialog [header]="editingId ? 'Editar Grupo' : 'Nuevo Grupo'" [(visible)]="dialogVisible" [modal]="true"
-    [style]="{ width: '480px' }" [draggable]="false">
-    <div class="dialog-form">
+  [style]="{ width: '480px' }" [draggable]="false">
+  <div class="group-form">
 
-        <div class="field">
-            <label for="g-nombre">Nombre *</label>
-            <input pInputText id="g-nombre" [(ngModel)]="draft.nombre" placeholder="Ej. Alpha Team" />
-        </div>
-
-        <div class="field-row">
-            <div class="field">
-                <label for="g-cat">Categoría</label>
-                <p-select id="g-cat" [options]="categories" [(ngModel)]="draft.categoria" placeholder="Seleccionar" />
-            </div>
-            <div class="field">
-                <label for="g-nivel">Nivel</label>
-                <p-select id="g-nivel" [options]="levels" [(ngModel)]="draft.nivel" placeholder="Seleccionar" />
-            </div>
-        </div>
-
-        <div class="field">
-            <label for="g-autor">Autor</label>
-            <input pInputText id="g-autor" [(ngModel)]="draft.autor" placeholder="Nombre del autor" />
-        </div>
-
-        <div class="field-row">
-            <div class="field">
-                <label for="g-miembros">Miembros</label>
-                <p-inputNumber id="g-miembros" [(ngModel)]="draft.miembros" [min]="0" [showButtons]="true" />
-            </div>
-            <div class="field">
-                <label for="g-tickets">Tickets</label>
-                <p-inputNumber id="g-tickets" [(ngModel)]="draft.tickets" [min]="0" [showButtons]="true" />
-            </div>
-        </div>
-
+    <div class="form-field">
+      <label class="form-label">Nombre *</label>
+      <input pInputText [(ngModel)]="draft.nombre" placeholder="Ej. Alpha Team" />
     </div>
 
-    <ng-template pTemplate="footer">
-        <p-button label="Cancelar" icon="pi pi-times" [text]="true" (onClick)="dialogVisible = false" />
-        <p-button label="Guardar" icon="pi pi-check" (onClick)="save()" />
-    </ng-template>
+    <div class="form-row">
+      <div class="form-field">
+        <label class="form-label">Categoría</label>
+        <p-select [options]="categories" [(ngModel)]="draft.categoria" placeholder="Seleccionar" />
+      </div>
+      <div class="form-field">
+        <label class="form-label">Nivel</label>
+        <p-select [options]="levels" [(ngModel)]="draft.nivel" placeholder="Seleccionar" />
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label">Autor</label>
+      <input pInputText [(ngModel)]="draft.autor" placeholder="Nombre del autor" />
+    </div>
+
+  </div>
+
+  <ng-template pTemplate="footer">
+    @if (isSaving()) {
+    <span class="saving-indicator"><i class="pi pi-spin pi-spinner"></i>Guardando...</span>
+    }
+    <p-button label="Cancelar" icon="pi pi-times" [text]="true" [disabled]="isSaving()" (onClick)="dialogVisible = false" />
+    <p-button [label]="isSaving() ? 'Guardando...' : 'Guardar'"
+      [icon]="isSaving() ? 'pi pi-spin pi-spinner' : 'pi pi-check'"
+      [disabled]="isSaving()" (onClick)="save()" />
+  </ng-template>
 </p-dialog>
