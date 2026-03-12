@@ -1,20 +1,9 @@
 import { Component, inject, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { TableModule } from 'primeng/table';
-import { ButtonModule } from 'primeng/button';
-import { DialogModule } from 'primeng/dialog';
-import { InputTextModule } from 'primeng/inputtext';
-import { SelectModule } from 'primeng/select';
-import { SelectButtonModule } from 'primeng/selectbutton';
-import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { ToastModule } from 'primeng/toast';
-import { TagModule } from 'primeng/tag';
-import { PanelModule } from 'primeng/panel';
-import { TooltipModule } from 'primeng/tooltip';
-import { BreadcrumbModule } from 'primeng/breadcrumb';
 import { CdkDrag, CdkDropList, CdkDropListGroup, CdkDragPlaceholder, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ConfirmationService, MessageService } from 'primeng/api';
+import { SelectButtonModule } from 'primeng/selectbutton';
 import { GroupService } from '../services/group.service';
 import { TicketService } from '../services/ticket.service';
 import { TicketUtilsService } from '../services/ticket-utils.service';
@@ -22,22 +11,24 @@ import { AuthService } from '../services/auth.service';
 import { ErrorHandlerService } from '../services/error-handler.service';
 import { PermissionService } from '../services/permission.service';
 import { HasRoleDirective } from '../directives/has-role.directive';
+import { HasPermissionDirective } from '../directives/has-permission.directive';
 import { Group, GroupLevel, GroupMember } from '../models/group.model';
 import { Ticket, TicketStatus, TicketPriority } from '../models/ticket.model';
 import { APP_PATHS } from '../app.paths';
+import { PRIMENG_MODULES } from '../primeng';
 
 type ViewMode = 'kanban' | 'list';
+type QuickFilter = 'all' | 'mine' | 'unassigned' | 'high-priority';
 
 @Component({
   selector: 'app-group',
   standalone: true,
   providers: [ConfirmationService, MessageService],
   imports: [
-    CommonModule, FormsModule, TableModule, ButtonModule, DialogModule,
-    InputTextModule, SelectModule, SelectButtonModule, ConfirmDialogModule,
-    ToastModule, TagModule, PanelModule, TooltipModule, BreadcrumbModule,
-    HasRoleDirective,
+    CommonModule, FormsModule, SelectButtonModule,
+    HasPermissionDirective,
     CdkDrag, CdkDropList, CdkDropListGroup, CdkDragPlaceholder,
+    ...PRIMENG_MODULES,
   ],
   templateUrl: './group.html',
   styleUrl: './group.css',
@@ -75,27 +66,75 @@ export class GroupPage {
 
   selectedGroup = signal<Group | null>(null);
   viewMode = signal<ViewMode>('kanban');
+  quickFilter = signal<QuickFilter>('all');
   newMemberEmail = '';
 
   readonly viewModeOptions = [
     { label: 'Kanban', value: 'kanban', icon: 'pi pi-th-large' },
     { label: 'Lista', value: 'list', icon: 'pi pi-list' },
   ];
+
+  readonly quickFilterOptions: Array<{ label: string; value: QuickFilter; icon: string }> = [
+    { label: 'Todos', value: 'all', icon: 'pi pi-list' },
+    { label: 'Mis tickets', value: 'mine', icon: 'pi pi-user' },
+    { label: 'Sin asignar', value: 'unassigned', icon: 'pi pi-inbox' },
+    { label: 'Alta prioridad', value: 'high-priority', icon: 'pi pi-exclamation-triangle' },
+  ];
+
   readonly kanbanStatuses: TicketStatus[] = ['Pendiente', 'En progreso', 'Revisión', 'Finalizado'];
+  readonly today = new Date();
 
-  readonly ticketsByStatus = computed(() => {
-    const grp = this.selectedGroup();
-    if (!grp) return {} as Record<TicketStatus, Ticket[]>;
-    return this.ticketService.getByGroupAndStatus(grp.id);
-  });
-
-  readonly groupTicketsList = computed(() => {
+  /** Tickets del grupo filtrados por filtro rapido */
+  readonly filteredGroupTickets = computed(() => {
     const grp = this.selectedGroup();
     if (!grp) return [];
-    return this.ticketService.getByGroup(grp.id);
+    const tickets = this.ticketService.getByGroup(grp.id);
+    const filter = this.quickFilter();
+    const currentUser = this.authService.currentUser?.name ?? '';
+
+    switch (filter) {
+      case 'mine':
+        return tickets.filter(t => t.assignedName === currentUser);
+      case 'unassigned':
+        return tickets.filter(t => !t.assignedTo);
+      case 'high-priority':
+        return tickets.filter(t => t.priority === 'Alta' || t.priority === 'Crítica');
+      default:
+        return tickets;
+    }
+  });
+
+  /** Tickets por estado (aplicando filtro rapido) */
+  readonly ticketsByStatus = computed(() => {
+    const map: Record<TicketStatus, Ticket[]> = {
+      Pendiente: [], 'En progreso': [], 'Revisión': [], Finalizado: [],
+    };
+    this.filteredGroupTickets().forEach(t => {
+      if (map[t.status]) map[t.status].push(t);
+    });
+    return map;
+  });
+
+  /** Stats del grupo seleccionado */
+  readonly groupStats = computed(() => {
+    const grp = this.selectedGroup();
+    if (!grp) return null;
+    const tickets = this.ticketService.getByGroup(grp.id);
+    return {
+      total: tickets.length,
+      pendiente: tickets.filter(t => t.status === 'Pendiente').length,
+      enProgreso: tickets.filter(t => t.status === 'En progreso').length,
+      revision: tickets.filter(t => t.status === 'Revisión').length,
+      finalizado: tickets.filter(t => t.status === 'Finalizado').length,
+    };
   });
 
   readonly memberList = computed(() => this.selectedGroup()?.memberList ?? []);
+
+  /** El usuario puede arrastrar tickets (requiere permiso 'edit') */
+  get canDragTickets(): boolean {
+    return this.permissions.can('edit');
+  }
 
   private emptyDraft(): Omit<Group, 'id'> {
     return {
@@ -113,6 +152,7 @@ export class GroupPage {
   selectGroup(group: Group): void {
     this.selectedGroup.set(group);
     this.viewMode.set('kanban');
+    this.quickFilter.set('all');
   }
 
   openCreate(): void {
@@ -145,7 +185,6 @@ export class GroupPage {
       return;
     }
     if (this.isSaving()) return;
-
     this.isSaving.set(true);
     const nombre = this.draft.nombre;
 
@@ -171,11 +210,12 @@ export class GroupPage {
       return;
     }
     this.confirmationService.confirm({
-      message: `¿Eliminar el grupo "${group.nombre}"? Esta acción no se puede deshacer.`,
-      header: 'Confirmar eliminación',
+      message: `Eliminar el grupo "${group.nombre}"? Esta accion no se puede deshacer.`,
+      header: 'Confirmar eliminacion',
       icon: 'pi pi-exclamation-triangle',
       acceptLabel: 'Eliminar',
       rejectLabel: 'Cancelar',
+      acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
         this.groupService.remove(group.id);
         if (this.selectedGroup()?.id === group.id) this.selectedGroup.set(null);
@@ -185,11 +225,20 @@ export class GroupPage {
   }
 
   dropTicket(event: CdkDragDrop<Ticket[]>, newStatus: TicketStatus): void {
+    if (!this.canDragTickets) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Sin permisos',
+        detail: 'Necesitas permiso de edicion para mover tickets.',
+        life: 3000,
+      });
+      return;
+    }
     if (event.previousContainer === event.container) return;
     const ticket = event.item.data as Ticket;
     const user = this.authService.currentUser?.name ?? 'Sistema';
     this.ticketService.updateStatus(ticket.id, newStatus, user);
-    this.messageService.add({ severity: 'success', summary: 'Estado actualizado', detail: `→ ${newStatus}`, life: 2000 });
+    this.messageService.add({ severity: 'success', summary: 'Ticket movido', detail: `Estado → ${newStatus}`, life: 2000 });
   }
 
   addMember(): void {
@@ -198,7 +247,7 @@ export class GroupPage {
     if (!grp || !email) return;
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      this.messageService.add({ severity: 'warn', summary: 'Email inválido', detail: 'Ingresa un correo válido.', life: 3000 });
+      this.messageService.add({ severity: 'warn', summary: 'Email invalido', detail: 'Ingresa un correo valido.', life: 3000 });
       return;
     }
     if (grp.memberList.some(m => m.email === email)) {
@@ -211,7 +260,7 @@ export class GroupPage {
     const updated = this.groups().find(g => g.id === grp.id);
     if (updated) this.selectedGroup.set(updated);
     this.newMemberEmail = '';
-    this.messageService.add({ severity: 'success', summary: 'Miembro añadido', detail: `${email} añadido.`, life: 3000 });
+    this.messageService.add({ severity: 'success', summary: 'Miembro anadido', detail: `${email} anadido.`, life: 3000 });
   }
 
   removeMember(member: GroupMember): void {

@@ -1,5 +1,109 @@
-.group-page {
-  min-height: 100vh;
+/* ── Stats globales del grupo ── */
+.group-stats-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.group-stat-card {
+  flex: 1;
+  min-width: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, white 5%, transparent);
+  border: 1px solid color-mix(in srgb, white 10%, transparent);
+  gap: 0.25rem;
+}
+
+.group-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.group-stat-label {
+  font-size: 0.7rem;
+  color: var(--p-text-muted-color);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.group-stat-card--pending .group-stat-value  { color: #94a3b8; }
+.group-stat-card--progress .group-stat-value { color: #60a5fa; }
+.group-stat-card--review .group-stat-value   { color: #f59e0b; }
+.group-stat-card--done .group-stat-value     { color: #4ade80; }
+
+/* ── Filtros rapidos ── */
+.quick-filters {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.quick-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, white 14%, transparent);
+  background: transparent;
+  color: var(--p-text-color);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.quick-filter-btn:hover {
+  background: color-mix(in srgb, white 8%, transparent);
+}
+
+.quick-filter-btn--active {
+  background: color-mix(in srgb, var(--p-primary-500) 20%, transparent);
+  border-color: var(--p-primary-500);
+  color: var(--p-primary-300);
+}
+
+/* ── Fecha vencida ── */
+.due-overdue {
+  color: #f87171;
+  font-weight: 600;
+}
+
+/* ── Kanban sin permiso de drag ── */
+.kanban-card--no-drag {
+  cursor: default;
+}
+
+.kanban-card--no-drag:hover {
+  border-color: color-mix(in srgb, white 14%, transparent);
+  box-shadow: none;
+}
+
+.drag-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+  margin-top: 0.5rem;
+}
+
+/* ── Header actions ── */
+.detail-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ── ID badge kanban ── */
+.kanban-card__id {
+  font-size: 0.7rem;
+  color: var(--p-text-muted-color);
 }
 
 /* ── Stats row ── */

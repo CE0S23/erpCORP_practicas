@@ -1,5 +1,64 @@
 .tickets-page {
   padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ── Filtros rapidos ── */
+.quick-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.quick-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, white 14%, transparent);
+  background: transparent;
+  color: var(--p-text-color);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.quick-filter-btn:hover {
+  background: color-mix(in srgb, white 8%, transparent);
+}
+
+.quick-filter-btn--active {
+  background: color-mix(in srgb, var(--p-primary-500) 20%, transparent);
+  border-color: var(--p-primary-500);
+  color: var(--p-primary-300);
+}
+
+/* ── Fecha vencida ── */
+.due-overdue {
+  color: #f87171;
+  font-weight: 600;
+}
+
+/* ── Comentarios input ── */
+.comment-input-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin-top: 0.5rem;
+}
+
+.comment-textarea {
+  flex: 1;
+  resize: vertical;
+  font-size: 0.875rem;
+}
+
+.field-error input,
+.field-error p-select {
+  border-color: var(--p-red-400) !important;
 }
 
 /* ── Table caption ── */

@@ -11,10 +11,13 @@
           styleClass="identity-avatar"
         />
         <div class="identity-info">
-          <h2 class="identity-name">{{ user?.name ?? 'Sin sesión' }}</h2>
-          <span class="identity-username">{{ '@' + (user?.username ?? '—') }}</span>
+          <h2 class="identity-name">{{ user?.name ?? 'Sin sesion' }}</h2>
+          <span class="identity-username">{{ '@' + (user?.username ?? '---') }}</span>
           <div class="identity-role-tag">
             <p-tag [value]="roleLabel()" [severity]="roleSeverity()" />
+            @if (!user?.enabled) {
+              <p-tag value="Cuenta deshabilitada" severity="danger" />
+            }
           </div>
         </div>
       </div>
@@ -24,7 +27,7 @@
       <div class="identity-meta">
         <div class="meta-row">
           <i class="pi pi-envelope meta-icon"></i>
-          <span>{{ user?.email ?? '—' }}</span>
+          <span>{{ user?.email ?? '---' }}</span>
         </div>
         @if (userGroup()) {
           <div class="meta-row">
@@ -44,58 +47,91 @@
             <span class="text-color-secondary">Sin grupo asignado</span>
           </div>
         }
+        <div class="meta-row">
+          <i class="pi pi-id-card meta-icon"></i>
+          <span class="u-muted" style="font-size:0.8rem">ID: {{ user?.id ?? '---' }}</span>
+        </div>
       </div>
     </p-card>
 
-    <!-- Tarjeta de ajustes -->
-    <p-card header="Ajustes de cuenta" styleClass="perfil-settings-card">
-      <div class="settings-list">
-        @for (setting of mockSettings; track setting.label) {
-          <div class="setting-row">
-            <div class="setting-label">
-              <i [class]="setting.icon + ' setting-icon'"></i>
-              <span>{{ setting.label }}</span>
-            </div>
-            <span class="setting-value">{{ setting.value }}</span>
+    <!-- Permisos del usuario -->
+    <p-card header="Mis permisos" styleClass="perfil-settings-card">
+      <div class="perms-section">
+        @for (perm of allPermissions; track perm) {
+          <div class="perm-item" [class.perm-item--active]="hasPermission(perm)">
+            <i [class]="permissionIcons[perm]"></i>
+            <span>{{ permissionLabels[perm] }}</span>
+            @if (hasPermission(perm)) {
+              <p-tag value="Activo" severity="success" styleClass="perm-status-tag" />
+            } @else {
+              <p-tag value="Sin permiso" severity="secondary" styleClass="perm-status-tag" />
+            }
           </div>
-          <p-divider styleClass="my-2" />
         }
       </div>
-
-      <div class="settings-edit-btn">
-        <p-button
-          label="Editar perfil"
-          icon="pi pi-user-edit"
-          [outlined]="true"
-          severity="secondary"
-        />
-      </div>
     </p-card>
 
-    <!-- Tarjeta de estadísticas de sesión -->
-    <p-card header="Sesión actual" styleClass="perfil-session-card">
-      <div class="session-stats">
-        <div class="stat-item">
-          <span class="stat-label">Estado</span>
-          <p-tag value="Activa" severity="success" />
+    <!-- Stats de carga de trabajo -->
+    <p-card header="Mi carga de trabajo" styleClass="perfil-session-card">
+      <div class="workload-stats">
+        <div class="wl-stat">
+          <span class="wl-value wl-pending">{{ myStats().abiertos }}</span>
+          <span class="wl-label">Pendientes</span>
         </div>
-        <p-divider />
-        <div class="stat-item">
-          <span class="stat-label">Tipo de cuenta</span>
-          <p-tag [value]="roleLabel()" [severity]="roleSeverity()" />
+        <div class="wl-stat">
+          <span class="wl-value wl-progress">{{ myStats().enProgreso }}</span>
+          <span class="wl-label">En Progreso</span>
         </div>
-        <p-divider />
-        <div class="stat-item">
-          <span class="stat-label">ID de usuario</span>
-          <span class="stat-value text-color-secondary">{{ user?.id ?? '—' }}</span>
+        <div class="wl-stat">
+          <span class="wl-value wl-review">{{ myStats().revision }}</span>
+          <span class="wl-label">En Revision</span>
         </div>
-        <p-divider />
-        <div class="stat-item">
-          <span class="stat-label">Autenticación</span>
-          <p-tag value="Hardcoded" severity="secondary" />
+        <div class="wl-stat">
+          <span class="wl-value wl-done">{{ myStats().hechos }}</span>
+          <span class="wl-label">Finalizados</span>
         </div>
       </div>
+      <p-divider />
+      <span class="wl-total">Total asignados: <strong>{{ myStats().total }}</strong></span>
     </p-card>
 
   </div>
+
+  <!-- Tickets asignados al usuario -->
+  @if (myTickets().length > 0) {
+  <div class="my-tickets-section">
+    <h3 class="section-title"><i class="pi pi-ticket"></i> Mis Tickets Asignados</h3>
+    <p-table
+      [value]="myTickets()"
+      [paginator]="true"
+      [rows]="5"
+      styleClass="p-datatable-sm p-datatable-striped"
+    >
+      <ng-template pTemplate="header">
+        <tr>
+          <th style="min-width:12rem">Titulo</th>
+          <th>Estado</th>
+          <th>Prioridad</th>
+          <th>Grupo</th>
+          <th>Fecha Limite</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-ticket>
+        <tr>
+          <td><span class="cell-truncate" style="max-width:11rem" [pTooltip]="ticket.titulo">{{ ticket.titulo }}</span></td>
+          <td><p-tag [value]="ticket.status" [severity]="statusSeverity(ticket.status)" /></td>
+          <td><p-tag [value]="ticket.priority" [severity]="prioritySeverity(ticket.priority)" /></td>
+          <td>{{ ticket.groupName }}</td>
+          <td>{{ ticket.dueDate | date:'dd/MM/yyyy' }}</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+  } @else {
+  <div class="no-tickets-msg">
+    <i class="pi pi-inbox"></i>
+    <span>No tienes tickets asignados actualmente.</span>
+  </div>
+  }
+
 </div>

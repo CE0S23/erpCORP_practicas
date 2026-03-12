@@ -1,4 +1,4 @@
-import { AppRole } from './role.model';
+import { AppRole, Permission, ROLE_DEFAULT_PERMISSIONS } from './role.model';
 
 export interface User {
     id: string;
@@ -6,6 +6,10 @@ export interface User {
     name: string;
     email: string;
     role: AppRole;
+    /** Permisos individuales del usuario — sobreescriben los del rol */
+    permissions: Permission[];
+    /** Indica si la cuenta esta habilitada */
+    enabled: boolean;
 }
 
 export interface LoginRequest {
@@ -35,9 +39,20 @@ export interface AuthState {
     token: string | null;
 }
 
-/** Credenciales hardcodeadas para validación en el frontend */
+/** Credenciales hardcodeadas para validacion en el frontend */
 export interface HardcodedCredential {
     email: string;
     password: string;
     user: User;
+}
+
+/** Crea un usuario con los permisos por defecto segun su rol */
+export function createUserWithDefaultPermissions(
+    partial: Omit<User, 'permissions' | 'enabled'>
+): User {
+    return {
+        ...partial,
+        permissions: [...ROLE_DEFAULT_PERMISSIONS[partial.role]],
+        enabled: true,
+    };
 }

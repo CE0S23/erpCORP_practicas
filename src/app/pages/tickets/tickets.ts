@@ -8,7 +8,7 @@ import { GroupService } from '../../services/group.service';
 import { AuthService } from '../../services/auth.service';
 import { ErrorHandlerService } from '../../services/error-handler.service';
 import { PermissionService } from '../../services/permission.service';
-import { HasRoleDirective } from '../../directives/has-role.directive';
+import { HasPermissionDirective } from '../../directives/has-permission.directive';
 import { Ticket, TicketStatus, TicketPriority } from '../../models/ticket.model';
 import { GroupMember } from '../../models/group.model';
 import { APP_PATHS } from '../../app.paths';
@@ -21,7 +21,7 @@ import { PRIMENG_MODULES } from '../../primeng';
     imports: [
         CommonModule,
         FormsModule,
-        HasRoleDirective,
+        HasPermissionDirective,
         ...PRIMENG_MODULES,
     ],
     templateUrl: './tickets.html',
@@ -42,6 +42,23 @@ export class TicketsPage {
     readonly groups = this.groupService.groups;
     readonly paths = APP_PATHS;
     readonly isSaving = signal(false);
+    readonly today = new Date();
+
+    /** Filtro rapido activo en la vista de lista */
+    readonly activeFilter = signal<'all' | 'mine' | 'unassigned' | 'high'>('all');
+
+    /** Tickets filtrados segun el filtro rapido activo */
+    readonly filteredTickets = computed(() => {
+        const all = this.tickets();
+        const filter = this.activeFilter();
+        const currentUser = this.authService.currentUser?.name ?? '';
+        switch (filter) {
+            case 'mine':       return all.filter(t => t.assignedName === currentUser);
+            case 'unassigned': return all.filter(t => !t.assignedTo);
+            case 'high':       return all.filter(t => t.priority === 'Alta' || t.priority === 'Crítica');
+            default:           return all;
+        }
+    });
 
     readonly breadcrumbItems = [
         { label: 'Dashboard', routerLink: this.paths.dashboard },
@@ -51,6 +68,8 @@ export class TicketsPage {
 
     detailVisible = false;
     selectedTicket: Ticket | null = null;
+    newComment = '';
+    isSendingComment = signal(false);
 
     formVisible = false;
     editingId: string | null = null;
@@ -95,7 +114,29 @@ export class TicketsPage {
 
     openDetail(ticket: Ticket): void {
         this.selectedTicket = ticket;
+        this.newComment = '';
         this.detailVisible = true;
+    }
+
+    sendComment(): void {
+        const text = this.newComment.trim();
+        if (!text || !this.selectedTicket) return;
+        if (this.isSendingComment()) return;
+
+        this.isSendingComment.set(true);
+        const author = this.authService.currentUser?.name ?? 'Anonimo';
+
+        try {
+            this.ticketService.addComment(this.selectedTicket.id, author, text);
+            // Refresca selectedTicket desde el signal
+            this.selectedTicket = this.ticketService.getById(this.selectedTicket.id) ?? this.selectedTicket;
+            this.newComment = '';
+            this.messageService.add({ severity: 'success', summary: 'Comentario agregado', detail: 'Tu comentario fue publicado.', life: 2000 });
+        } catch {
+            this.errorHandler.dispatch('ERR_500_GENERIC');
+        } finally {
+            this.isSendingComment.set(false);
+        }
     }
 
     openCreate(): void {

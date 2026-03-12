@@ -42,15 +42,36 @@
         }
     </nav>
 
+    <!-- Permisos del usuario actual en el footer -->
+    @if (!collapsed && currentUser()) {
+        <div class="sidebar-user-bar">
+            <div class="sidebar-user-info">
+                <div class="sidebar-avatar">{{ userInitials() }}</div>
+                <div class="sidebar-user-details">
+                    <span class="sidebar-user-name">{{ currentUser()!.name }}</span>
+                    <span class="sidebar-user-role">{{ currentUser()!.role }}</span>
+                </div>
+            </div>
+            <div class="sidebar-perms">
+                @for (perm of currentUser()!.permissions; track perm) {
+                    <span class="sidebar-perm-chip" [title]="permissionLabels[perm]">
+                        <i [class]="permissionIcons[perm]"></i>
+                    </span>
+                }
+            </div>
+        </div>
+    }
+
     <div class="sidebar-footer">
-        <button class="logout-btn" (click)="logout()" title="Cerrar sesión">
+        <button class="logout-btn" (click)="logout()" title="Cerrar sesion">
             <i class="pi pi-power-off"></i>
             @if (!collapsed) {
-                <span class="nav-label">Cerrar sesión</span>
+                <span class="nav-label">Cerrar sesion</span>
             }
         </button>
         @if (!collapsed) {
             <div class="sidebar-version">v {{ version }}</div>
         }
     </div>
+
 </aside>

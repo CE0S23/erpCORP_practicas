@@ -1,24 +1,36 @@
 <p-toast position="top-right" />
+<p-confirmDialog />
 
 <div class="usuarios-page">
-  <div class="usuarios-header">
+
+  <!-- Header -->
+  <div class="page-header">
     <div>
-      <h1 class="usuarios-title">Usuarios</h1>
-      <p class="usuarios-subtitle">Gestión y administración de usuarios registrados en el sistema.</p>
+      <h1 class="page-title">Gestion de Usuarios</h1>
+      <p class="page-subtitle">Administra cuentas, roles y permisos individuales del sistema.</p>
     </div>
-    <div class="usuarios-actions">
-      <span class="total-badge">Total: {{ totalUsuarios() }}</span>
+    <div class="header-stats">
+      <p-chip icon="pi pi-check-circle" [label]="totalActive() + ' activos'" styleClass="chip-active" />
+      <p-chip icon="pi pi-ban" [label]="totalInactive() + ' inactivos'" styleClass="chip-inactive" />
+      <ng-container *hasRole="['superAdmin', 'admin']">
+        <p-button
+          label="Nuevo Usuario"
+          icon="pi pi-user-plus"
+          (onClick)="openCreate()"
+        />
+      </ng-container>
     </div>
   </div>
 
+  <!-- Tabla de usuarios -->
   <p-table
     [value]="usuarios()"
     [paginator]="true"
     [rows]="8"
     [rowsPerPageOptions]="[8, 16, 32]"
     dataKey="id"
-    styleClass="p-datatable-sm p-datatable-striped"
-    [globalFilterFields]="['nombre', 'correo', 'grupo', 'rol']"
+    styleClass="p-datatable-sm"
+    [globalFilterFields]="['name', 'username', 'email', 'role']"
     #dt
   >
     <ng-template pTemplate="caption">
@@ -37,78 +49,176 @@
 
     <ng-template pTemplate="header">
       <tr>
-        <th pSortableColumn="nombre" style="min-width: 12rem">
-          Nombre <p-sortIcon field="nombre" />
+        <th pSortableColumn="name" style="min-width: 13rem">
+          Usuario <p-sortIcon field="name" />
         </th>
-        <th pSortableColumn="grupo" style="min-width: 9rem">
-          Grupo <p-sortIcon field="grupo" />
+        <th pSortableColumn="role" style="min-width: 8rem">
+          Rol <p-sortIcon field="role" />
         </th>
-        <th pSortableColumn="rol" style="min-width: 8rem">
-          Rol <p-sortIcon field="rol" />
-        </th>
-        <th pSortableColumn="correo" style="min-width: 12rem">
-          Correo <p-sortIcon field="correo" />
-        </th>
-        <th style="min-width: 7rem">Estatus</th>
-        <th style="width: 8rem">Acciones</th>
+        <th style="min-width: 6rem">Estado</th>
+        <th style="min-width: 20rem">Permisos</th>
+        <ng-container *hasRole="['superAdmin', 'admin']">
+          <th style="width: 9rem">Acciones</th>
+        </ng-container>
       </tr>
     </ng-template>
 
     <ng-template pTemplate="body" let-usuario>
-      <tr>
+      <tr [class.row-disabled]="!usuario.enabled">
+        <!-- Nombre / email -->
         <td>
-          <span class="u-semibold">{{ usuario.nombre }}</span>
-        </td>
-        <td>
-          <span class="cell-truncate" style="max-width: 8rem" [pTooltip]="usuario.grupo">
-            {{ usuario.grupo }}
-          </span>
-        </td>
-        <td>
-          <p-tag [value]="rolLabel(usuario.rol)" [severity]="rolSeverity(usuario.rol)" />
-        </td>
-        <td>
-          <span class="cell-truncate" style="max-width: 11rem" [pTooltip]="usuario.correo">
-            {{ usuario.correo }}
-          </span>
-        </td>
-        <td>
-          <p-tag value="Activo" severity="success" />
-        </td>
-        <td>
-          <div class="row-actions">
-            <ng-container *hasRole="['admin', 'medium']">
-              <p-button
-                icon="pi pi-pencil"
-                [text]="true"
-                [rounded]="true"
-                severity="warn"
-                (onClick)="notifyEdit(usuario)"
-                pTooltip="Editar"
-              />
-            </ng-container>
-            <ng-container *hasRole="'admin'">
-              <p-button
-                icon="pi pi-trash"
-                [text]="true"
-                [rounded]="true"
-                severity="danger"
-                (onClick)="notifyDelete(usuario)"
-                pTooltip="Eliminar"
-              />
-            </ng-container>
+          <div class="user-cell">
+            <p-avatar
+              [label]="usuario.name.charAt(0).toUpperCase()"
+              shape="circle"
+              [style]="{ 'background-color': usuario.enabled ? 'var(--p-primary-500)' : 'var(--p-surface-400)', 'color': '#fff' }"
+            />
+            <div class="user-cell__info">
+              <span class="user-name">{{ usuario.name }}</span>
+              <span class="user-email">{{ usuario.email }}</span>
+            </div>
           </div>
         </td>
+
+        <!-- Rol -->
+        <td>
+          <p-tag
+            [value]="roleLabel(usuario.role)"
+            [severity]="roleSeverity(usuario.role)"
+          />
+        </td>
+
+        <!-- Estado habilitado -->
+        <td>
+          @if (usuario.enabled) {
+            <p-tag value="Activo" severity="success" />
+          } @else {
+            <p-tag value="Inactivo" severity="danger" />
+          }
+        </td>
+
+        <!-- Permisos granulares -->
+        <td>
+          <div class="perms-row">
+            @for (perm of allPermissions; track perm) {
+              <div class="perm-badge" [class.perm-badge--active]="hasPermissionFor(usuario, perm)">
+                <i [class]="permissionIcons[perm]"></i>
+                <span>{{ permissionLabels[perm] }}</span>
+                <ng-container *hasRole="['superAdmin', 'admin']">
+                  <p-toggleSwitch
+                    [ngModel]="hasPermissionFor(usuario, perm)"
+                    (ngModelChange)="togglePermission(usuario, perm)"
+                    [disabled]="!canManage"
+                    styleClass="perm-toggle"
+                  />
+                </ng-container>
+              </div>
+            }
+          </div>
+        </td>
+
+        <!-- Acciones -->
+        <ng-container *hasRole="['superAdmin', 'admin']">
+          <td>
+            <div class="row-actions">
+              <p-button
+                [icon]="usuario.enabled ? 'pi pi-ban' : 'pi pi-check-circle'"
+                [text]="true"
+                [rounded]="true"
+                [severity]="usuario.enabled ? 'warn' : 'success'"
+                [pTooltip]="usuario.enabled ? 'Deshabilitar' : 'Habilitar'"
+                (onClick)="toggleEnabled(usuario)"
+              />
+              <p-button
+                icon="pi pi-refresh"
+                [text]="true"
+                [rounded]="true"
+                severity="info"
+                pTooltip="Restablecer permisos del rol"
+                (onClick)="resetToRoleDefaults(usuario)"
+              />
+              <ng-container *hasRole="'superAdmin'">
+                <p-button
+                  icon="pi pi-trash"
+                  [text]="true"
+                  [rounded]="true"
+                  severity="danger"
+                  pTooltip="Eliminar usuario"
+                  (onClick)="confirmDelete(usuario)"
+                />
+              </ng-container>
+            </div>
+          </td>
+        </ng-container>
       </tr>
     </ng-template>
 
     <ng-template pTemplate="emptymessage">
       <tr>
-        <td colspan="6" class="u-empty-cell">
+        <td colspan="5" class="u-empty-cell">
           <i class="pi pi-users u-empty-icon"></i>
-          <span class="u-empty-text">No hay usuarios registrados</span>
+          <span class="u-empty-text">No hay usuarios en el sistema</span>
         </td>
       </tr>
     </ng-template>
   </p-table>
+
 </div>
+
+<!-- Dialog nuevo usuario -->
+<p-dialog
+  header="Nuevo Usuario"
+  [(visible)]="dialogVisible"
+  [modal]="true"
+  [style]="{ width: '480px' }"
+  [draggable]="false"
+  [closable]="!isSaving()"
+>
+  <div class="user-form">
+
+    <div class="form-field">
+      <label class="form-label">Nombre completo <span class="required-star">*</span></label>
+      <input pInputText [(ngModel)]="draft.name" placeholder="Ej. Juan Perez" />
+    </div>
+
+    <div class="form-row">
+      <div class="form-field">
+        <label class="form-label">Username <span class="required-star">*</span></label>
+        <input pInputText [(ngModel)]="draft.username" placeholder="juan_perez" />
+      </div>
+      <div class="form-field">
+        <label class="form-label">Rol</label>
+        <p-select [options]="roleOptions" [(ngModel)]="draft.role" placeholder="Seleccionar" />
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label">Correo electronico <span class="required-star">*</span></label>
+      <input pInputText [(ngModel)]="draft.email" type="email" placeholder="usuario@empresa.com" />
+    </div>
+
+    <p class="form-hint-msg">
+      <i class="pi pi-info-circle"></i>
+      Los permisos se asignaran automaticamente segun el rol seleccionado.
+      Podras ajustarlos despues desde esta misma vista.
+    </p>
+
+  </div>
+
+  <ng-template pTemplate="footer">
+    <p-button
+      label="Cancelar"
+      icon="pi pi-times"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="isSaving()"
+      (onClick)="dialogVisible.set(false)"
+    />
+    <p-button
+      [label]="isSaving() ? 'Creando...' : 'Crear usuario'"
+      [icon]="isSaving() ? 'pi pi-spin pi-spinner' : 'pi pi-user-plus'"
+      [disabled]="isSaving()"
+      (onClick)="saveUser()"
+    />
+  </ng-template>
+</p-dialog>

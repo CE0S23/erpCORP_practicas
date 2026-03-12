@@ -5,6 +5,13 @@ import {
 import { AppRole } from '../models/role.model';
 import { PermissionService } from '../services/permission.service';
 
+/**
+ * Directiva estructural que muestra el contenido solo si el usuario
+ * en sesion tiene el rol indicado.
+ *
+ * Uso: <div *hasRole="'admin'">...</div>
+ *      <div *hasRole="['admin', 'medium']">...</div>
+ */
 @Directive({
   selector: '[hasRole]',
   standalone: true,
