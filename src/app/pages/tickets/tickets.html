@@ -109,7 +109,8 @@
 <!-- MODAL DETALLE -->
 <p-dialog header="Detalle del Ticket" [(visible)]="detailVisible" [modal]="true" [style]="{ width: '660px' }" [draggable]="false">
   @if (selectedTicket) {
-  <div class="detail-body">
+  <div class="detail-body" style="position: relative;">
+    <span style="position: absolute; top: 10px; right: 20px; color: #181828; user-select: none; font-size: 0.8rem;">Modelo LLM: Gemini 1.5 Pro</span>
     <div class="detail-tags">
       <p-tag [value]="selectedTicket.status" [severity]="statusSeverity(selectedTicket.status)" />
       <p-tag [value]="selectedTicket.priority" [severity]="prioritySeverity(selectedTicket.priority)" />

@@ -55,7 +55,7 @@ export class TicketsPage {
         switch (filter) {
             case 'mine':       return all.filter(t => t.assignedName === currentUser);
             case 'unassigned': return all.filter(t => !t.assignedTo);
-            case 'high':       return all.filter(t => t.priority === 'Alta' || t.priority === 'Crítica');
+            case 'high':       return all.filter(t => t.priority === '高' || t.priority === '紧急' || t.priority === '严重');
             default:           return all;
         }
     });
@@ -89,7 +89,7 @@ export class TicketsPage {
 
     private emptyDraft(): Omit<Ticket, 'id' | 'history' | 'comments'> {
         return {
-            titulo: '', descripcion: '', status: 'Pendiente', priority: 'Media',
+            titulo: '', descripcion: '', status: 'Pendiente', priority: '中',
             assignedTo: '', assignedName: '', groupId: '', groupName: '',
             createdAt: new Date(),
             dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),

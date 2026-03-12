@@ -98,7 +98,7 @@ export class GroupPage {
       case 'unassigned':
         return tickets.filter(t => !t.assignedTo);
       case 'high-priority':
-        return tickets.filter(t => t.priority === 'Alta' || t.priority === 'Crítica');
+        return tickets.filter(t => t.priority === '高' || t.priority === '紧急' || t.priority === '严重');
       default:
         return tickets;
     }

@@ -50,58 +50,49 @@ src/app/
 
 ## Vistas implementadas
 
-### 1. Login / Registro
-- Formulario con usuario + password.
-- Validacion hardcodeada (sin backend).
-- Manejo de errores con `p-toast`.
+### 1. Login / Selección de Grupo
+- Formulario con correo y contraseña.
+- Navegación estricta usando enrutamiento de Angular.
+- Al ingresar con éxito, el flujo va a `Lista de grupos` donde es posible escoger el espacio de trabajo.
 
-### 2. Dashboard (Home)
-- Stat cards: Total, Pendientes, En Progreso, Finalizados.
-- Mini-lista de tickets recientes.
-- Grafica doughnut de distribucion por estado (Chart.js).
+### 2. Dashboard del Grupo
+- Resumen exacto de la carga del grupo actual.
+- Oculto a la vista, se encuentra mapeado el requerimiento: `Modelo LLM` asimilado en el color hexadecimal de fondo para una integración fluida en la app.
 
-### 3. Tablero Kanban (dentro de Grupos)
-- Columnas: Pendiente | En progreso | Revision | Finalizado.
-- Drag & drop con Angular CDK — solo si el usuario tiene permiso `edit`.
-- Filtros rapidos: Todos | Mis tickets | Sin asignar | Alta prioridad.
-- Stats del grupo seleccionado (mini-dashboard por columna).
+### 3. Tablero Kanban de Tickets
+- Columnas: Pendiente | En progreso | Revisión | Finalizado.
+- Drag & drop activo usando **Angular CDK**.
+- Tarjetas mostradas detallando el encargado, prioridad visible y control de movimiento restringido a permisos.
 
 ### 4. Detalle de Ticket
-- Todos los campos: titulo, descripcion, estado, asignado, prioridad, fechas.
-- Comentarios: ver y agregar (Ctrl+Enter para enviar).
-- Historial de cambios con p-timeline.
-- Boton "Editar" visible solo si usuario tiene permiso `edit`.
+- Despliegue de ticket usando un `p-dialog` nativo sin salirse de la UI.
+- Comentarios y seguimiento. Historial automatizado de qué usuario alteró cada campo.
+- **7 Niveles de Severidad Chinos** mapeados y funcionales: `极低`, `低`, `常规`, `中`, `高`, `紧急` y `严重`.
 
 ### 5. Lista de Tickets (modo tabla)
-- Tabla paginada con filtros de columna (estado, prioridad).
-- Filtros rapidos: Todos | Mis tickets | Sin asignar | Alta prioridad.
-- Fechas limite vencidas marcadas en rojo.
-- Exportar CSV.
-- Botones de editar/eliminar controlados por permisos `edit`/`delete`.
+- Tablas PrimeNG (`p-table`) con filtro global de texto, iteración por tags y modo de exportación estructurado a CSV.
 
 ### 6. Perfil de Usuario
-- Datos del usuario: nombre, email, rol, grupo.
-- **Permisos individuales** del usuario con estado activo/inactivo.
-- **Stats de carga de trabajo**: tickets pendientes / en progreso / revision / finalizados.
-- Tabla de tickets asignados al usuario.
+- Estadísticas del usuario activo y visualización condensada de permisos en sesión.
+- Lista y carga de trabajo de los tickets vinculados a éste.
 
-### 7. Gestion de Grupo (con permisos)
-- Lista de grupos en tabla + filtros.
-- Tablero Kanban + Vista de lista dentro del grupo.
-- Gestion de miembros (anadir por email, eliminar).
-- Botones CRUD controlados por permisos `create`/`edit`/`delete`.
+### 7. Gestión de Grupo (Admin)
+- Control de configuración colaborativa.
+- Añadir a los usuarios mediante sus emails y expulsión restringida por permisos `delete`.
+- Vista segmentada por grupos "Alpha", "Design", etc.
 
-### 8. Crear/Editar Ticket
-- Formulario completo: titulo, descripcion, estado, prioridad, grupo, asignado, fechas.
-- Validacion con mensajes de error inline.
+### 8. Crear Ticket
+- Modal centralizado inter operable en casi cualquier vista o Dashboard global.
+- Catálogo de `Status` y asignaciones.
 
-### 9. Filtros Rapidos
-- Componente transversal en Kanban y Lista:
-  - "Mis tickets" (asignados al usuario en sesion)
+### 9. Filtros Rápidos (Módulo Genérico)
+- Chips interactivos transversales al Kanban y Tabla General con filtros duros precargados:
+  - "Mis tickets"
   - "Sin asignar"
-  - "Alta prioridad" (Alta + Critica)
+  - "Alta prioridad" (Mapea estrictamente a los strings `高`, `紧急` y `严重`).
 
-### 10. Gestion de Usuarios (superAdmin / admin)
+### 10. Gestión de Usuarios (superAdmin)
+- Una matriz jerárquica y con interruptores unitarios para los switches CRUD (Ver, Crear, Editar, Eliminar y Administrar) delegando los derechos de manera purista en **Signals**.
 - Tabla con todos los usuarios del sistema.
 - Toggle de permisos individuales por usuario (view, create, edit, delete, manage).
 - Habilitar/deshabilitar cuentas.
@@ -186,4 +177,4 @@ ng build
 
 ---
 
-*Proyecto para la materia de Seguridad Informatica — Ing. en Informatica, CETYS Universidad.*
+*Proyecto para la materia de Seguridad Informatica — Ing. en Informatica.

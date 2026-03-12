@@ -1,5 +1,5 @@
 export type TicketStatus = 'Pendiente' | 'En progreso' | 'Revisión' | 'Finalizado';
-export type TicketPriority = 'Baja' | 'Media' | 'Alta' | 'Crítica';
+export type TicketPriority = '极低' | '低' | '常规' | '中' | '高' | '紧急' | '严重';
 
 export interface TicketComment {
     id: string;

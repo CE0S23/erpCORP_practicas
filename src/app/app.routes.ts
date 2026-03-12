@@ -23,6 +23,11 @@ export const routes: Routes = [
         children: [
             {
                 path: '',
+                redirectTo: 'group',
+                pathMatch: 'full'
+            },
+            {
+                path: 'dashboard-all',
                 loadComponent: () =>
                     import('./pages/home/home').then((m) => m.Home),
             },

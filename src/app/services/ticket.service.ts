@@ -12,7 +12,7 @@ export class TicketService {
             titulo: 'Configurar pipeline de CI/CD para rama main',
             descripcion: 'Implementar GitHub Actions para ejecutar tests y deploy automático al hacer merge a main. Incluir lint checks y coverage.',
             status: 'En progreso',
-            priority: 'Alta',
+            priority: '高',
             assignedTo: 'u1',
             assignedName: 'Juan Developer',
             groupId: '1',
@@ -31,7 +31,7 @@ export class TicketService {
             titulo: 'Refactorizar módulo de autenticación a signals',
             descripcion: 'Migrar el AuthService de BehaviorSubject a signal() para consistencia con el resto del proyecto.',
             status: 'Pendiente',
-            priority: 'Media',
+            priority: '中',
             assignedTo: 'u2',
             assignedName: 'Ana Frontend',
             groupId: '1',
@@ -46,7 +46,7 @@ export class TicketService {
             titulo: 'Optimizar queries de base de datos',
             descripcion: 'Las consultas de listado de grupos tardan más de 2s. Agregar índices y revisar N+1 queries en el ORM.',
             status: 'Revisión',
-            priority: 'Crítica',
+            priority: '严重',
             assignedTo: 'u3',
             assignedName: 'Admin ERP',
             groupId: '1',
@@ -58,7 +58,7 @@ export class TicketService {
             ],
             history: [
                 { id: 'h2', field: 'status', oldValue: 'En progreso', newValue: 'Revisión', changedBy: 'Admin ERP', date: new Date('2026-03-01T10:00:00') },
-                { id: 'h3', field: 'priority', oldValue: 'Alta', newValue: 'Crítica', changedBy: 'Admin ERP', date: new Date('2026-02-20T09:00:00') },
+                { id: 'h3', field: 'priority', oldValue: '高', newValue: '严重', changedBy: 'Admin ERP', date: new Date('2026-02-20T09:00:00') },
             ],
         },
         {
@@ -66,7 +66,7 @@ export class TicketService {
             titulo: 'Actualizar paleta de colores del sistema de diseño',
             descripcion: 'Cambiar colores primarios según nuevas guías de marca. Aplicar en todos los componentes PrimeNG.',
             status: 'Finalizado',
-            priority: 'Baja',
+            priority: '低',
             assignedTo: 'u4',
             assignedName: 'María UX',
             groupId: '2',
@@ -83,7 +83,7 @@ export class TicketService {
             titulo: 'Crear wireframes para módulo de reportes',
             descripcion: 'Diseñar flows de UX y wireframes de alta fidelidad para el módulo de reportes usando Figma.',
             status: 'En progreso',
-            priority: 'Media',
+            priority: '中',
             assignedTo: 'u5',
             assignedName: 'Pedro UI',
             groupId: '2',
@@ -98,7 +98,7 @@ export class TicketService {
             titulo: 'Resolver tickets de soporte sin respuesta (+48h)',
             descripcion: 'Hay 12 tickets sin respuesta que superan el SLA de 48 horas. Priorizar y asignar agentes disponibles.',
             status: 'Pendiente',
-            priority: 'Crítica',
+            priority: '严重',
             assignedTo: 'u6',
             assignedName: 'Luis Soporte',
             groupId: '3',
@@ -115,7 +115,7 @@ export class TicketService {
             titulo: 'Documentar procedimientos de escalamiento L1→L2→L3',
             descripcion: 'Crear el manual interno de procedimientos para escalamiento con scripts de respuesta estandarizados.',
             status: 'En progreso',
-            priority: 'Alta',
+            priority: '高',
             assignedTo: 'u7',
             assignedName: 'Carla Ops',
             groupId: '3',
@@ -130,7 +130,7 @@ export class TicketService {
             titulo: 'Implementar chat de soporte en tiempo real',
             descripcion: 'Integrar WebSocket para soporte en tiempo real con los clientes desde el panel de agentes.',
             status: 'Revisión',
-            priority: 'Alta',
+            priority: '高',
             assignedTo: 'u8',
             assignedName: 'Jorge Helpdesk',
             groupId: '3',
@@ -147,7 +147,7 @@ export class TicketService {
     readonly tickets = this._tickets.asReadonly();
 
     readonly statuses: TicketStatus[] = ['Pendiente', 'En progreso', 'Revisión', 'Finalizado'];
-    readonly priorities: TicketPriority[] = ['Baja', 'Media', 'Alta', 'Crítica'];
+    readonly priorities: TicketPriority[] = ['极低', '低', '常规', '中', '高', '紧急', '严重'];
 
     readonly statsCount = computed(() => ({
         total: this._tickets().length,
