@@ -13,10 +13,10 @@
     "@prisma/client": "^5.22.0",
     "dotenv":         "^16.4.5",
     "fastify":        "^4.28.1",
-    "fastify-plugin": "^4.5.1"
+    "fastify-plugin": "^4.5.1",
+    "prisma":         "^5.22.0"
   },
   "devDependencies": {
-    "pino-pretty": "^11.2.2",
-    "prisma":      "^5.22.0"
+    "pino-pretty": "^11.2.2"
   }
 }

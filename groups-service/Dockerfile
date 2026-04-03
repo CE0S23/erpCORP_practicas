@@ -6,4 +6,4 @@ RUN npm install --omit=dev
 COPY . .
 RUN npx prisma generate
 EXPOSE 3002
-CMD ["node", "src/server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node src/server.js"]
