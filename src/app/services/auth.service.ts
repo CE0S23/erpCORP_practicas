@@ -88,7 +88,7 @@ export class AuthService {
 
     me(): Observable<User> {
         return this.http.get<any>(`${this.apiUrl}/auth/me`).pipe(
-            map(dto => this._mapDtoToUser(dto)),
+            map(res => this._mapDtoToUser(res?.user ?? res)),
             tap(user => {
                 this.currentUser.set(user);
                 this.authState.set({

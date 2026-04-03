@@ -25,7 +25,7 @@ import { APP_PATHS } from '../../app.paths';
       </div>
 
       <div class="auth-container">
-        <a [routerLink]="paths.landing" class="auth-logo">
+        <a class="auth-logo" (click)="onLogoClick($event)">
           ERP<strong>Pro</strong>
         </a>
 
@@ -120,7 +120,7 @@ import { APP_PATHS } from '../../app.paths';
 
     .auth-logo {
       font-size: 1.6rem; font-weight: 300; color: #e5e7eb;
-      text-decoration: none; letter-spacing: -0.02em;
+      text-decoration: none; letter-spacing: -0.02em; cursor: pointer;
     }
     .auth-logo strong { font-weight: 800; color: #6366f1; }
 
@@ -159,11 +159,25 @@ export class Login {
 
   readonly paths = APP_PATHS;
   readonly isLoading = signal(false);
+  private logoClicks = 0;
 
   readonly loginForm = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required]],
   });
+
+  onLogoClick(event: Event): void {
+    event.preventDefault();
+    this.logoClicks++;
+    if (this.logoClicks >= 5) {
+      this.messageService.add({
+        severity: 'info',
+        summary: 'catch u',
+        life: 3000,
+      });
+      this.logoClicks = 0;
+    }
+  }
 
   isFieldInvalid(field: string): boolean {
     const control = this.loginForm.get(field);

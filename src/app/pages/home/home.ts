@@ -1,4 +1,4 @@
-import { Component, inject, computed, PLATFORM_ID, OnInit } from '@angular/core';
+import { Component, inject, computed, effect, PLATFORM_ID, OnInit } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -43,11 +43,19 @@ export class Home implements OnInit {
             .slice(0, 5)
     );
 
+    constructor() {
+        // Rebuild chart data reactively whenever ticket stats change
+        effect(() => {
+            if (this.isBrowser) {
+                const s = this.stats();
+                this.chartData = this.utils.buildChartData(s.pendiente, s.enProgreso, s.revision, s.finalizado);
+            }
+        });
+    }
+
     ngOnInit(): void {
-        if (this.isBrowser) {
-            const s = this.stats();
-            this.chartData = this.utils.buildChartData(s.pendiente, s.enProgreso, s.revision, s.finalizado);
-        }
+        // Load tickets so the dashboard has data to display
+        this.ticketService.getTickets().subscribe();
 
         const user = this.authService.currentUser();
         if (user) {
