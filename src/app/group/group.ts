@@ -85,6 +85,8 @@ export class GroupPage implements OnInit {
   // ── Estado del CRUD de grupos ─────────────────────────────────────────────
   groupDialogVisible = false;
   editingId: string | null = null;
+  groupSubmitted = false;
+  ticketSubmitted = false;
   draft: Omit<Group, 'id'> = this.emptyDraft();
 
   // ── Estado del grupo seleccionado ─────────────────────────────────────────
@@ -223,6 +225,7 @@ export class GroupPage implements OnInit {
     }
     this.draft    = this.emptyDraft();
     this.editingId = null;
+    this.groupSubmitted = false;
     this.groupDialogVisible = true;
   }
 
@@ -231,6 +234,7 @@ export class GroupPage implements OnInit {
       this.errorHandler.dispatchPermissionError();
       return;
     }
+    this.groupSubmitted = false;
     this.draft = {
       nombre: group.nombre, categoria: group.categoria, categoriaId: group.categoriaId,
       nivel: group.nivel, autor: group.autor, miembros: group.miembros,
@@ -241,6 +245,7 @@ export class GroupPage implements OnInit {
   }
 
   save(): void {
+    this.groupSubmitted = true;
     if (!this.draft.nombre.trim()) {
       this.messageService.add({
         severity: 'warn', summary: 'Campo requerido',
@@ -324,6 +329,7 @@ export class GroupPage implements OnInit {
     }
     const grp = this.selectedGroup();
     if (!grp) return;
+    this.ticketSubmitted = false;
     this.ticketDraft = {
       ...this.emptyTicketDraft(),
       groupId:   grp.id,
@@ -338,6 +344,7 @@ export class GroupPage implements OnInit {
   }
 
   saveTicket(): void {
+    this.ticketSubmitted = true;
     if (!this.ticketDraft.titulo.trim()) {
       this.messageService.add({
         severity: 'warn', summary: 'Campo requerido',

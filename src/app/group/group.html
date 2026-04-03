@@ -311,8 +311,12 @@
 >
   <div class="group-form">
     <div class="form-field">
-      <label class="form-label">Nombre *</label>
-      <input pInputText [(ngModel)]="draft.nombre" placeholder="Ej. Alpha Team" />
+      <label class="form-label">Nombre <span class="required-star">*</span></label>
+      <input pInputText [(ngModel)]="draft.nombre" placeholder="Ej. Alpha Team"
+        [class.ng-invalid]="groupSubmitted && !draft.nombre.trim()" />
+      @if (groupSubmitted && !draft.nombre.trim()) {
+        <small class="p-error"><i class="pi pi-exclamation-circle"></i> El nombre del grupo es obligatorio</small>
+      }
     </div>
     <div class="form-row">
       <div class="form-field">
@@ -365,7 +369,11 @@
 
     <div class="form-field">
       <label class="form-label">Título <span class="required-star">*</span></label>
-      <input pInputText [(ngModel)]="ticketDraft.titulo" placeholder="Ej. Corregir error en módulo de pagos" />
+      <input pInputText [(ngModel)]="ticketDraft.titulo" placeholder="Ej. Corregir error en módulo de pagos"
+        [class.ng-invalid]="ticketSubmitted && !ticketDraft.titulo.trim()" />
+      @if (ticketSubmitted && !ticketDraft.titulo.trim()) {
+        <small class="p-error"><i class="pi pi-exclamation-circle"></i> El título es obligatorio</small>
+      }
     </div>
 
     <div class="form-field">

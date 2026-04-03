@@ -1,103 +1,193 @@
 # erpCORP — Sistema ERP de Gestion de Proyectos
 
 > Proyecto academico de Seguridad Informatica, 8vo cuatrimestre.
-> Frontend Angular 19 + PrimeNG 19 — sin backend real, datos hardcodeados.
+> Frontend Angular 19 + Backend con microservicios (Fastify / NestJS) + PostgreSQL (Neon).
 
 ---
+
+## Arquitectura
+
+```
+┌─────────────────┐       ┌───────────────────┐       ┌─────────┐
+│  Angular 19     │──────▶│  API Gateway      │──────▶│  Redis  │
+│  SSR + Signals  │       │  Fastify :3000     │       │  :6379  │
+│  PrimeNG 19     │       │  JWT / Rate Limit  │       └─────────┘
+└─────────────────┘       └────────┬──────────┘
+                                   │
+              ┌────────────────────┼────────────────────┐
+              ▼                    ▼                    ▼
+      ┌──────────────┐    ┌──────────────┐    ┌───────────────┐
+      │ User Service │    │Groups Service│    │Tickets Service│
+      │ NestJS :3001 │    │Fastify :3002 │    │Fastify  :3003 │
+      └──────┬───────┘    └──────┬───────┘    └───────┬───────┘
+             │                   │                    │
+             └───────────────────┼────────────────────┘
+                                 ▼
+                       ┌──────────────────┐
+                       │  PostgreSQL      │
+                       │  Neon (cloud)    │
+                       └──────────────────┘
+```
 
 ## Tecnologias
 
-| Libreria        | Version | Uso |
-|----------------|---------|-----|
-| Angular         | 19      | Framework principal (standalone components, signals) |
-| PrimeNG         | 19      | Componentes UI (Table, Dialog, Toast, Kanban CDK…) |
-| Angular CDK     | 19      | Drag & Drop para el tablero Kanban |
-| Chart.js        | 4       | Graficas del Dashboard |
+| Capa | Tecnologia | Version |
+|------|-----------|---------|
+| Frontend | Angular (standalone, signals, zoneless) | 19 |
+| UI Components | PrimeNG | 19 |
+| Drag & Drop | Angular CDK | 19 |
+| Graficas | Chart.js | 4 |
+| API Gateway | Fastify + JWT + Rate Limit | 4 |
+| User Service | NestJS + Prisma ORM | 10 |
+| Groups Service | Fastify + Prisma ORM | 4 |
+| Tickets Service | Fastify + Prisma ORM | 4 |
+| Base de datos | PostgreSQL (Neon cloud) | 16 |
+| Cache | Redis | 7 |
 
 ---
 
-## Estructura del proyecto
+## Levantar el proyecto con Docker
 
+### Requisitos
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado
+- Node.js >= 18 (para el frontend)
+- Cuenta en [Neon](https://neon.tech/) con una base de datos PostgreSQL creada
+
+### 1. Clonar el repositorio
+
+```bash
+git clone https://github.com/CE0S23/erpCORP_practicas.git
+cd erpCORP_practicas
 ```
-src/app/
-├── components/
-│   ├── sidebar/          # Barra lateral con user-bar y chips de permisos
-│   ├── perfil/           # Perfil del usuario: permisos, stats, tickets asignados
-│   └── usuarios/         # CRUD de usuarios y gestion granular de permisos
-├── directives/
-│   ├── has-role.directive.ts       # *hasRole="['admin','superAdmin']"
-│   └── has-permission.directive.ts # *hasPermission="'edit'"
-├── group/                # Tablero Kanban + lista + gestion de grupo
-├── models/
-│   ├── role.model.ts     # AppRole, Permission, ROLE_DEFAULT_PERMISSIONS
-│   ├── user.model.ts     # User con campo permissions[]
-│   ├── ticket.model.ts   # Ticket con comments[] y history[]
-│   └── group.model.ts    # Group y GroupMember
-├── pages/
-│   ├── home/             # Dashboard con graficas y tickets recientes
-│   ├── login/            # Login + Registro
-│   └── tickets/          # Vista de lista de tickets con filtros rapidos
-└── services/
-    ├── auth.service.ts         # SYSTEM_USERS global signal; CRUD de usuarios
-    ├── permission.service.ts   # can(permission), hasRole(role), userCan(id, perm)
-    ├── ticket.service.ts       # CRUD de tickets + addComment + updateStatus
-    ├── ticket-utils.service.ts # Helpers de severidad/iconos de estado y prioridad
-    ├── group.service.ts        # CRUD de grupos + addMember/removeMember
-    └── error-handler.service.ts
+
+### 2. Configurar variables de entorno
+
+Cada servicio tiene un `.env.example`. Copia y configura cada uno:
+
+```bash
+cp api-gateway/.env.example api-gateway/.env
+cp user-service/.env.example user-service/.env
+cp groups-service/.env.example groups-service/.env
+cp tickets-service/.env.example tickets-service/.env
+```
+
+**Variables clave:**
+
+| Variable | Servicio(s) | Descripcion |
+|----------|------------|-------------|
+| `JWT_SECRET` | api-gateway | Secreto para firmar JWT (minimo 32 caracteres) |
+| `DATABASE_URL` | user-service, groups-service, tickets-service | URL de conexion PostgreSQL (Neon) |
+| `INTERNAL_SECRET` | api-gateway, user-service | Secreto compartido para endpoints internos |
+| `REDIS_URL` | api-gateway | En Docker se sobreescribe a `redis://redis:6379` |
+
+### 3. Construir y levantar los servicios
+
+```bash
+docker compose up --build
+```
+
+Esto levanta automaticamente:
+
+| Servicio | Puerto | Descripcion |
+|----------|--------|-------------|
+| redis | 6379 | Cache para rate limiting y blacklist de tokens |
+| api-gateway | 3000 | Punto de entrada, JWT, proxy reverso, logs y metricas |
+| user-service | 3001 | Usuarios, roles, permisos, logs centralizados, metricas |
+| groups-service | 3002 | Grupos, categorias, miembros |
+| tickets-service | 3003 | Tickets, comentarios, historial de cambios |
+
+> Las migraciones de Prisma se ejecutan automaticamente al arranque (`npx prisma migrate deploy`).
+
+### 4. Levantar el frontend
+
+En otra terminal:
+
+```bash
+npm install
+ng serve
+```
+
+Abrir `http://localhost:4200`. El frontend se conecta al API Gateway en `http://localhost:3000`.
+
+### 5. Comandos utiles
+
+```bash
+# Ver logs de un servicio
+docker compose logs -f api-gateway
+
+# Detener todo
+docker compose down
+
+# Detener y limpiar volumenes (Redis data)
+docker compose down -v
+
+# Reconstruir un servicio especifico
+docker compose up --build user-service
 ```
 
 ---
 
-## Vistas implementadas
+## Levantar sin Docker (desarrollo local)
 
-### 1. Login / Selección de Grupo
-- Formulario con correo y contraseña.
-- Navegación estricta usando enrutamiento de Angular.
-- Al ingresar con éxito, el flujo va a `Lista de grupos` donde es posible escoger el espacio de trabajo.
+Requiere Redis corriendo en `localhost:6379`.
 
-### 2. Dashboard del Grupo
-- Resumen exacto de la carga del grupo actual.
-- Oculto a la vista, se encuentra mapeado el requerimiento: `Modelo LLM` asimilado en el color hexadecimal de fondo para una integración fluida en la app.
+```bash
+# Terminal 1 — User Service
+cd user-service && npm install && npx prisma migrate deploy && npm run start:dev
 
-### 3. Tablero Kanban de Tickets
-- Columnas: Pendiente | En progreso | Revisión | Finalizado.
-- Drag & drop activo usando **Angular CDK**.
-- Tarjetas mostradas detallando el encargado, prioridad visible y control de movimiento restringido a permisos.
+# Terminal 2 — Groups Service
+cd groups-service && npm install && npx prisma migrate deploy && node src/server.js
 
-### 4. Detalle de Ticket
-- Despliegue de ticket usando un `p-dialog` nativo sin salirse de la UI.
-- Comentarios y seguimiento. Historial automatizado de qué usuario alteró cada campo.
-- **7 Niveles de Severidad Chinos** mapeados y funcionales: `极低`, `低`, `常规`, `中`, `高`, `紧急` y `严重`.
+# Terminal 3 — Tickets Service
+cd tickets-service && npm install && npx prisma migrate deploy && node src/server.js
 
-### 5. Lista de Tickets (modo tabla)
-- Tablas PrimeNG (`p-table`) con filtro global de texto, iteración por tags y modo de exportación estructurado a CSV.
+# Terminal 4 — API Gateway
+cd api-gateway && npm install && node src/server.js
 
-### 6. Perfil de Usuario
-- Estadísticas del usuario activo y visualización condensada de permisos en sesión.
-- Lista y carga de trabajo de los tickets vinculados a éste.
+# Terminal 5 — Frontend Angular
+npm install && ng serve
+```
 
-### 7. Gestión de Grupo (Admin)
-- Control de configuración colaborativa.
-- Añadir a los usuarios mediante sus emails y expulsión restringida por permisos `delete`.
-- Vista segmentada por grupos "Alpha", "Design", etc.
+---
 
-### 8. Crear Ticket
-- Modal centralizado inter operable en casi cualquier vista o Dashboard global.
-- Catálogo de `Status` y asignaciones.
+## Esquema de respuesta universal
 
-### 9. Filtros Rápidos (Módulo Genérico)
-- Chips interactivos transversales al Kanban y Tabla General con filtros duros precargados:
-  - "Mis tickets"
-  - "Sin asignar"
-  - "Alta prioridad" (Mapea estrictamente a los strings `高`, `紧急` y `严重`).
+Todas las respuestas del API siguen el formato:
 
-### 10. Gestión de Usuarios (superAdmin)
-- Una matriz jerárquica y con interruptores unitarios para los switches CRUD (Ver, Crear, Editar, Eliminar y Administrar) delegando los derechos de manera purista en **Signals**.
-- Tabla con todos los usuarios del sistema.
-- Toggle de permisos individuales por usuario (view, create, edit, delete, manage).
-- Habilitar/deshabilitar cuentas.
-- Restablecer permisos al defecto del rol.
-- CRUD completo (crear / eliminar — solo superAdmin puede eliminar).
+```json
+{
+  "statusCode": 200,
+  "intOpCode": "SxGW200",
+  "serviceCode": "SxUS200",
+  "data": { ... }
+}
+```
+
+| Prefijo | Servicio |
+|---------|----------|
+| `SxGW` | API Gateway |
+| `SxUS` | User Service |
+| `SxGR` | Groups Service |
+| `SxTK` | Tickets Service |
+
+---
+
+## Endpoints principales
+
+| Metodo | Ruta | Descripcion | Auth |
+|--------|------|-------------|------|
+| POST | `/auth/login` | Login (devuelve JWT) | No |
+| POST | `/auth/logout` | Logout (blacklist en Redis) | JWT |
+| GET | `/auth/me` | Perfil del usuario autenticado | JWT |
+| GET | `/api/users` | Listar usuarios (paginado) | JWT + permiso |
+| POST | `/api/users` | Crear usuario | JWT + permiso |
+| GET | `/api/groups` | Listar grupos | JWT + permiso |
+| POST | `/api/groups` | Crear grupo | JWT + permiso |
+| GET | `/api/tickets` | Listar tickets | JWT + permiso |
+| POST | `/api/tickets` | Crear ticket | JWT + permiso |
+| GET | `/api/metrics` | Metricas de rendimiento | JWT |
+| GET | `/health` | Health check del gateway | No |
 
 ---
 
@@ -105,121 +195,65 @@ src/app/
 
 ### Roles
 
-| Rol        | Descripcion |
-|-----------|-------------|
-| superAdmin | Todos los permisos. Puede eliminar usuarios y acceder a todo. |
-| admin      | Gestion de usuarios y permisos. No puede eliminar usuarios. |
-| medium     | Puede crear y editar tickets/grupos. |
-| user       | Solo lectura. |
+| Rol | Descripcion |
+|-----|-------------|
+| superAdmin | Todos los permisos. Puede eliminar usuarios. |
+| admin | Gestion de usuarios y permisos. No puede eliminar usuarios. |
+| medium | Puede crear y editar tickets/grupos. |
+| user | Solo lectura. |
 
 ### Permisos granulares
 
-Cada usuario tiene un array `permissions[]` **independiente de su rol**, que puede ser ajustado por un admin/superAdmin.
+Cada usuario tiene un array `permissions[]` independiente de su rol, ajustable por admin/superAdmin.
 
-| Permiso  | Label       | Controlado con |
-|---------|-------------|----------------|
-| `view`   | Ver         | Acceso a rutas |
-| `create` | Crear       | Boton "Nuevo" en tickets y grupos |
-| `edit`   | Editar      | Botones de edicion; drag & drop en Kanban |
-| `delete` | Eliminar    | Botones de eliminacion |
-| `manage` | Administrar | Gestion de usuarios |
+Los permisos se organizan por seccion (Usuarios, Grupos, Tickets) con acciones: ver, crear, editar, eliminar y administrar.
 
-### Directivas
+---
 
-```html
-<!-- Solo aparece si el usuario tiene el permiso en su perfil -->
-<ng-container *hasPermission="'edit'">
-  <p-button label="Editar" />
-</ng-container>
+## Logs y Metricas
 
-<!-- Solo aparece si el usuario tiene el rol indicado -->
-<ng-container *hasRole="['admin','superAdmin']">
-  <p-button label="Solo admins" />
-</ng-container>
+El sistema registra automaticamente:
+
+- **Logs centralizados:** Cada request al API Gateway se guarda en la tabla `logs` (endpoint, metodo, IP, usuario, status code, servicio, error stack).
+- **Metricas de rendimiento:** Tiempo de respuesta por endpoint en la tabla `metrics` (count, total ms, promedio). Consultables via `GET /api/metrics`.
+
+Ambos se envian de forma asincrona (fire-and-forget) para no afectar el rendimiento.
+
+---
+
+## Estructura del proyecto
+
+```
+├── api-gateway/           # Fastify — JWT, rate limit, proxy, logs/metricas
+│   └── src/
+│       ├── plugins/       # helmet, cors, redis, rate-limit, jwt
+│       └── routes/        # auth, proxy, metrics
+├── user-service/          # NestJS — usuarios, roles, permisos, logs, metricas
+│   ├── prisma/            # Schema + migraciones
+│   └── src/
+│       ├── users/         # Controllers, service, guards, DTOs
+│       ├── logs/          # Logs y metricas (endpoints internos)
+│       ├── prisma/        # PrismaService
+│       └── common/        # Interceptor de respuesta, filtro de excepciones
+├── groups-service/        # Fastify — grupos, categorias, miembros
+│   ├── prisma/
+│   └── src/
+├── tickets-service/       # Fastify — tickets, comentarios, historial
+│   ├── prisma/
+│   └── src/
+├── src/                   # Angular 19 frontend
+│   └── app/
+│       ├── components/    # sidebar, perfil, usuarios
+│       ├── directives/    # hasPermission, hasRole
+│       ├── group/         # Kanban + lista + gestion de miembros
+│       ├── interceptors/  # auth, api-response, error
+│       ├── models/        # role, user, ticket, group
+│       ├── pages/         # home, login, register, tickets
+│       └── services/      # auth, permission, ticket, group, error-handler
+├── docker-compose.yml     # Orquestacion de todos los servicios
+└── README.md
 ```
 
 ---
 
-## Usuarios de prueba
-
-| Usuario      | Password  | Rol        | Permisos por defecto |
-|-------------|-----------|-----------|----------------------|
-| superadmin  | super123  | superAdmin | view, create, edit, delete, manage |
-| admin       | admin123  | admin      | view, create, edit, delete, manage |
-| editor      | editor123 | medium     | view, create, edit |
-| user        | user123   | user       | view |
-
----
-
-## Instrucciones de uso
-
-```bash
-# Instalar dependencias
-npm install
-
-# Desarrollo
-npm run dev
-# o
-ng serve
-
-# Build produccion
-ng build
-```
-
----
-
-## Notas del proyecto
-
-- **Sin backend ni base de datos**: todos los datos se almacenan en signals de Angular en memoria. Al recargar la pagina, se resetean los datos de prueba.
-- **Permisos individuales**: cada usuario puede tener un set de permisos diferente al default de su rol. El superAdmin/admin puede modificarlos desde la vista de Gestion de Usuarios.
-- **Drag & Drop Kanban**: el movimiento de tarjetas entre columnas solo esta habilitado si el usuario tiene el permiso `edit` en su perfil.
-- **Comentarios e historial**: cada cambio de estado o actualizacion de campo en un ticket se registra en el historial. Los comentarios se pueden agregar desde el detalle del ticket.
-
----
-
-*Proyecto para la materia de Seguridad Informatica — Ing. en Informatica.
-
----
-
-## Backend con Docker
-
-### Requisitos
-- Docker Desktop
-- Node 20+
-
-### Levantar backend
-```bash
-docker compose up -d
-```
-
-### Ver logs
-```bash
-docker compose logs -f [servicio]
-# servicios: api-gateway | user-service | groups-service | tickets-service | redis
-```
-
-### Frontend local
-```bash
-npm run dev
-# o: ng serve
-```
-
-### Detener
-```bash
-docker compose down
-```
-
-### Limpiar volúmenes
-```bash
-docker compose down -v
-```
-
-### Servicios y puertos
-
-| Servicio        | Puerto | Tecnologia   |
-|----------------|--------|-------------|
-| api-gateway     | 3000   | Fastify      |
-| user-service    | 3001   | NestJS       |
-| groups-service  | 3002   | Fastify      |
-| tickets-service | 3003   | Fastify      |
-| redis           | 6379   | Redis 7      |
+*Proyecto para la materia de Seguridad Informatica — Ing. en Informatica, 8vo cuatrimestre.*

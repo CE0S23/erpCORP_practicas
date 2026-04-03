@@ -55,6 +55,7 @@ export class UsuariosPage {
 
   dialogVisible = signal(false);
   isSaving      = signal(false);
+  submitted     = false;
   draft         = this.emptyDraft();
 
   readonly roleOptions: Array<{ label: string; value: AppRole }> = [
@@ -168,11 +169,13 @@ export class UsuariosPage {
       return;
     }
     this.draft = this.emptyDraft();
+    this.submitted = false;
     this.dialogVisible.set(true);
   }
 
   saveUser(): void {
-    if (!this.draft.username.trim() || !this.draft.email.trim() || !this.draft.name.trim()) {
+    this.submitted = true;
+    if (!this.draft.name.trim() || !this.draft.username.trim() || !this.draft.email.trim()) {
       this.messageService.add({
         severity: 'warn',
         summary:  'Campos requeridos',
