@@ -9,8 +9,9 @@ import rateLimitPlugin from './plugins/rate-limit.js';
 import jwtPlugin       from './plugins/jwt.js';
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
-import authRoutes  from './routes/auth.js';
-import proxyRoutes from './routes/proxy.js';
+import authRoutes    from './routes/auth.js';
+import metricsRoutes from './routes/metrics.js';
+import proxyRoutes   from './routes/proxy.js';
 
 // ─── Logger setup ─────────────────────────────────────────────────────────────
 
@@ -56,8 +57,9 @@ fastify.register(rateLimitPlugin);
 fastify.register(jwtPlugin);
 
 // ─── Route registration ───────────────────────────────────────────────────────
-fastify.register(authRoutes,  { prefix: '/auth' });
-fastify.register(proxyRoutes, { prefix: '/api'  });
+fastify.register(authRoutes,    { prefix: '/auth' });
+fastify.register(metricsRoutes, { prefix: '/api'  });
+fastify.register(proxyRoutes,   { prefix: '/api'  });
 
 // ─── Health check (no auth required) ─────────────────────────────────────────
 fastify.get('/health', {
@@ -72,6 +74,59 @@ fastify.get('/health', {
     env:       process.env.NODE_ENV ?? 'development',
   },
 }));
+
+// ─── Request timing ──────────────────────────────────────────────────────
+fastify.addHook('onRequest', (request, _reply, done) => {
+  request.startTime = Date.now();
+  done();
+});
+
+// ─── Fire-and-forget logs & metrics ──────────────────────────────────────
+
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET || '';
+const SERVICE_RESOURCE_MAP = {
+  users: 'users-service', groups: 'groups-service', tickets: 'tickets-service',
+};
+
+function resolveService(url) {
+  const segment = (url.replace(/^\/api/, '').split('/').filter(Boolean)[0] || '').toLowerCase();
+  return SERVICE_RESOURCE_MAP[segment] || 'api-gateway';
+}
+
+fastify.addHook('onResponse', (request, reply, done) => {
+  const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+  const elapsed = Date.now() - (request.startTime || Date.now());
+  const statusCode = reply.statusCode;
+  const endpoint = request.url;
+  const method = request.method;
+  const userId = request.user?.id || null;
+  const ip = request.ip;
+  const service = resolveService(request.url);
+  const errorStack = statusCode >= 400 ? (reply.errorStack || null) : null;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Internal-Secret': INTERNAL_SECRET,
+  };
+
+  // Fire-and-forget: log
+  fetch(`${userServiceUrl}/internal/logs`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ endpoint, method, userId, ip, statusCode, service, errorStack }),
+    signal: AbortSignal.timeout(5_000),
+  }).catch(err => fastify.log.warn({ err: err.message }, '[logs] failed to save log'));
+
+  // Fire-and-forget: metric
+  fetch(`${userServiceUrl}/internal/metrics`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ endpoint, method, responseTimeMs: elapsed }),
+    signal: AbortSignal.timeout(5_000),
+  }).catch(err => fastify.log.warn({ err: err.message }, '[metrics] failed to save metric'));
+
+  done();
+});
 
 // ─── Universal JSON response schema (SxGW) ───────────────────────────────────
 

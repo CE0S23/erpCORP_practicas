@@ -81,3 +81,32 @@ model RolePermission {
   @@id([roleId, permissionId])
   @@map("role_permissions")
 }
+
+// ─── Logs & Metrics ──────────────────────────────────────────────────────────
+
+model Log {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  timestamp  DateTime @default(now()) @db.Timestamptz
+  endpoint   String
+  method     String   @db.VarChar(10)
+  userId     String?  @map("user_id")
+  ip         String   @db.VarChar(45)
+  statusCode Int      @map("status_code")
+  service    String   @db.VarChar(50)
+  errorStack String?  @map("error_stack") @db.Text
+
+  @@map("logs")
+}
+
+model Metric {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  endpoint           String
+  method             String   @db.VarChar(10)
+  requestCount       Int      @default(1) @map("request_count")
+  totalResponseTimeMs BigInt  @default(0) @map("total_response_time_ms")
+  avgResponseTimeMs  Float    @default(0) @map("avg_response_time_ms")
+  lastUpdated        DateTime @default(now()) @updatedAt @map("last_updated") @db.Timestamptz
+
+  @@unique([endpoint, method])
+  @@map("metrics")
+}
