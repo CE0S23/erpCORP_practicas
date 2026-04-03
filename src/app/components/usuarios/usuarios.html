@@ -6,13 +6,13 @@
   <!-- Header -->
   <div class="page-header">
     <div>
-      <h1 class="page-title">Gestion de Usuarios</h1>
+      <h1 class="page-title">Gestión de Usuarios</h1>
       <p class="page-subtitle">Administra cuentas, roles y permisos individuales del sistema.</p>
     </div>
     <div class="header-stats">
       <p-chip icon="pi pi-check-circle" [label]="totalActive() + ' activos'" styleClass="chip-active" />
       <p-chip icon="pi pi-ban" [label]="totalInactive() + ' inactivos'" styleClass="chip-inactive" />
-      <ng-container *hasRole="['superAdmin', 'admin']">
+      <ng-container *appHasPermission="'create_users'">
         <p-button
           label="Nuevo Usuario"
           icon="pi pi-user-plus"
@@ -49,22 +49,17 @@
 
     <ng-template pTemplate="header">
       <tr>
-        <th pSortableColumn="name" style="min-width: 13rem">
-          Usuario <p-sortIcon field="name" />
-        </th>
-        <th pSortableColumn="role" style="min-width: 8rem">
-          Rol <p-sortIcon field="role" />
-        </th>
-        <th style="min-width: 6rem">Estado</th>
-        <th style="min-width: 20rem">Permisos</th>
-        <ng-container *hasRole="['superAdmin', 'admin']">
-          <th style="width: 9rem">Acciones</th>
-        </ng-container>
+        <th pSortableColumn="name"  style="min-width: 13rem">Usuario <p-sortIcon field="name" /></th>
+        <th pSortableColumn="role"  style="min-width: 7rem">Rol <p-sortIcon field="role" /></th>
+        <th style="min-width: 5rem">Estado</th>
+        <th style="min-width: 26rem">Permisos por sección</th>
+        <th style="width: 9rem">Acciones</th>
       </tr>
     </ng-template>
 
     <ng-template pTemplate="body" let-usuario>
       <tr [class.row-disabled]="!usuario.enabled">
+
         <!-- Nombre / email -->
         <td>
           <div class="user-cell">
@@ -82,10 +77,7 @@
 
         <!-- Rol -->
         <td>
-          <p-tag
-            [value]="roleLabel(usuario.role)"
-            [severity]="roleSeverity(usuario.role)"
-          />
+          <p-tag [value]="roleLabel(usuario.role)" [severity]="roleSeverity(usuario.role)" />
         </td>
 
         <!-- Estado habilitado -->
@@ -97,30 +89,45 @@
           }
         </td>
 
-        <!-- Permisos granulares -->
+        <!-- Permisos granulares agrupados por sección -->
         <td>
-          <div class="perms-row">
-            @for (perm of allPermissions; track perm) {
-              <div class="perm-badge" [class.perm-badge--active]="hasPermissionFor(usuario, perm)">
-                <i [class]="permissionIcons[perm]"></i>
-                <span>{{ permissionLabels[perm] }}</span>
-                <ng-container *hasRole="['superAdmin', 'admin']">
-                  <p-toggleSwitch
-                    [ngModel]="hasPermissionFor(usuario, perm)"
-                    (ngModelChange)="togglePermission(usuario, perm)"
-                    [disabled]="!canManage"
-                    styleClass="perm-toggle"
-                  />
-                </ng-container>
-              </div>
-            }
-          </div>
+          <!--
+            Referencia oculta a systemUsers() para que Angular (OnPush) detecte
+            cuando cambia cualquier permiso y re-evalúe hasPermissionFor().
+          -->
+          <ng-container *ngIf="systemUsers() as _liveUsers">
+            <div class="perm-sections">
+              @for (group of permissionGroups; track group.label) {
+                <div class="perm-section">
+                  <span class="perm-section__label"><i [class]="group.icon"></i> {{ group.label }}</span>
+                  <div class="perm-chips">
+                    @for (perm of group.permissions; track perm) {
+                      <div
+                        class="perm-chip"
+                        [class.perm-chip--on]="hasPermissionFor(usuario, perm)"
+                        [title]="permissionLabels[perm]"
+                      >
+                        <i [class]="permissionIcons[perm]"></i>
+                        <ng-container *appHasPermission="'edit_user'; targetUserRole: usuario.role; targetUserId: usuario.id">
+                          <p-toggleSwitch
+                            [ngModel]="hasPermissionFor(usuario, perm)"
+                            (ngModelChange)="togglePermission(usuario, perm, $event)"
+                            styleClass="perm-toggle-sm"
+                          />
+                        </ng-container>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </ng-container>
         </td>
 
-        <!-- Acciones -->
-        <ng-container *hasRole="['superAdmin', 'admin']">
-          <td>
-            <div class="row-actions">
+        <!-- Acciones de fila -->
+        <td>
+          <div class="row-actions">
+            <ng-container *appHasPermission="'edit_user'; targetUserRole: usuario.role; targetUserId: usuario.id">
               <p-button
                 [icon]="usuario.enabled ? 'pi pi-ban' : 'pi pi-check-circle'"
                 [text]="true"
@@ -137,19 +144,19 @@
                 pTooltip="Restablecer permisos del rol"
                 (onClick)="resetToRoleDefaults(usuario)"
               />
-              <ng-container *hasRole="'superAdmin'">
-                <p-button
-                  icon="pi pi-trash"
-                  [text]="true"
-                  [rounded]="true"
-                  severity="danger"
-                  pTooltip="Eliminar usuario"
-                  (onClick)="confirmDelete(usuario)"
-                />
-              </ng-container>
-            </div>
-          </td>
-        </ng-container>
+            </ng-container>
+            <ng-container *appHasPermission="'delete_users'; targetUserRole: usuario.role; targetUserId: usuario.id">
+              <p-button
+                icon="pi pi-trash"
+                [text]="true"
+                [rounded]="true"
+                severity="danger"
+                pTooltip="Eliminar usuario"
+                (onClick)="confirmDelete(usuario)"
+              />
+            </ng-container>
+          </div>
+        </td>
       </tr>
     </ng-template>
 
@@ -199,8 +206,8 @@
 
     <p class="form-hint-msg">
       <i class="pi pi-info-circle"></i>
-      Los permisos se asignaran automaticamente segun el rol seleccionado.
-      Podras ajustarlos despues desde esta misma vista.
+      Los permisos se asignan automaticamente segun el rol seleccionado.
+      Podras ajustarlos individualmente desde esta misma pantalla.
     </p>
 
   </div>

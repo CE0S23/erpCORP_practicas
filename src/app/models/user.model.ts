@@ -10,6 +10,7 @@ export interface User {
     permissions: Permission[];
     /** Indica si la cuenta esta habilitada */
     enabled: boolean;
+    avatarUrl?: string;
 }
 
 export interface LoginRequest {
@@ -37,6 +38,7 @@ export interface AuthState {
     user: User | null;
     isAuthenticated: boolean;
     token: string | null;
+    loading: boolean;
 }
 
 /** Credenciales hardcodeadas para validacion en el frontend */

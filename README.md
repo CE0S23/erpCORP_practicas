@@ -178,3 +178,48 @@ ng build
 ---
 
 *Proyecto para la materia de Seguridad Informatica — Ing. en Informatica.
+
+---
+
+## Backend con Docker
+
+### Requisitos
+- Docker Desktop
+- Node 20+
+
+### Levantar backend
+```bash
+docker compose up -d
+```
+
+### Ver logs
+```bash
+docker compose logs -f [servicio]
+# servicios: api-gateway | user-service | groups-service | tickets-service | redis
+```
+
+### Frontend local
+```bash
+npm run dev
+# o: ng serve
+```
+
+### Detener
+```bash
+docker compose down
+```
+
+### Limpiar volúmenes
+```bash
+docker compose down -v
+```
+
+### Servicios y puertos
+
+| Servicio        | Puerto | Tecnologia   |
+|----------------|--------|-------------|
+| api-gateway     | 3000   | Fastify      |
+| user-service    | 3001   | NestJS       |
+| groups-service  | 3002   | Fastify      |
+| tickets-service | 3003   | Fastify      |
+| redis           | 6379   | Redis 7      |

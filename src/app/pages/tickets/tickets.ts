@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ConfirmationService, MessageService } from 'primeng/api';
@@ -28,34 +28,34 @@ import { PRIMENG_MODULES } from '../../primeng';
     styleUrl: './tickets.css',
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TicketsPage {
+export class TicketsPage implements OnInit {
     private readonly ticketService = inject(TicketService);
-    private readonly groupService = inject(GroupService);
-    private readonly authService = inject(AuthService);
-    private readonly messageService = inject(MessageService);
+    private readonly groupService  = inject(GroupService);
+    private readonly authService   = inject(AuthService);
+    private readonly messageService      = inject(MessageService);
     private readonly confirmationService = inject(ConfirmationService);
-    private readonly errorHandler = inject(ErrorHandlerService);
+    private readonly errorHandler  = inject(ErrorHandlerService);
     readonly permissions = inject(PermissionService);
-    readonly utils = inject(TicketUtilsService);
+    readonly utils       = inject(TicketUtilsService);
 
     readonly tickets = this.ticketService.tickets;
-    readonly groups = this.groupService.groups;
-    readonly paths = APP_PATHS;
-    readonly isSaving = signal(false);
-    readonly today = new Date();
+    readonly groups  = this.groupService.groups;
+    readonly paths   = APP_PATHS;
+    readonly isSaving   = signal(false);
+    readonly isLoading  = signal(true);
+    readonly today      = new Date();
 
-    /** Filtro rapido activo en la vista de lista */
     readonly activeFilter = signal<'all' | 'mine' | 'unassigned' | 'high'>('all');
 
-    /** Tickets filtrados segun el filtro rapido activo */
     readonly filteredTickets = computed(() => {
-        const all = this.tickets();
+        const all    = this.tickets();
         const filter = this.activeFilter();
-        const currentUser = this.authService.currentUser?.name ?? '';
+        const userId = this.authService.currentUser()?.id ?? '';
         switch (filter) {
-            case 'mine':       return all.filter(t => t.assignedName === currentUser);
+            case 'mine':       return all.filter(t => t.assignedTo === userId);
             case 'unassigned': return all.filter(t => !t.assignedTo);
-            case 'high':       return all.filter(t => t.priority === '高' || t.priority === '紧急' || t.priority === '严重');
+            case 'high':       return all.filter(t =>
+                t.priority === '高' || t.priority === '紧急' || t.priority === '严重');
             default:           return all;
         }
     });
@@ -77,7 +77,7 @@ export class TicketsPage {
     draft = this.emptyDraft();
     availableMembers: GroupMember[] = [];
 
-    readonly statusOptions = this.ticketService.statuses.map(s => ({ label: s, value: s }));
+    readonly statusOptions   = this.ticketService.statuses.map(s => ({ label: s, value: s }));
     readonly priorityOptions = this.ticketService.priorities.map(p => ({ label: p, value: p }));
 
     readonly groupOptions = computed(() =>
@@ -96,12 +96,20 @@ export class TicketsPage {
         };
     }
 
-    statusSeverity(s: TicketStatus) { return this.utils.statusSeverity(s); }
-    prioritySeverity(p: TicketPriority) { return this.utils.prioritySeverity(p); }
+    statusSeverity(s: TicketStatus)   { return this.utils.statusSeverity(s);   }
+    prioritySeverity(p: TicketPriority){ return this.utils.prioritySeverity(p); }
+
+    ngOnInit(): void {
+        this.ticketService.getTickets().subscribe({
+            next:  () => this.isLoading.set(false),
+            error: () => this.isLoading.set(false),
+        });
+        this.groupService.getGroups().subscribe();
+    }
 
     onGroupChange(): void {
         const group = this.groups().find(g => g.id === this.draft.groupId);
-        this.draft.groupName = group?.nombre ?? '';
+        this.draft.groupName  = group?.nombre ?? '';
         this.draft.assignedTo = '';
         this.draft.assignedName = '';
         this.availableMembers = group?.memberList ?? [];
@@ -113,9 +121,9 @@ export class TicketsPage {
     }
 
     openDetail(ticket: Ticket): void {
-        this.selectedTicket = ticket;
-        this.newComment = '';
-        this.detailVisible = true;
+        this.selectedTicket  = ticket;
+        this.newComment      = '';
+        this.detailVisible   = true;
     }
 
     sendComment(): void {
@@ -124,40 +132,44 @@ export class TicketsPage {
         if (this.isSendingComment()) return;
 
         this.isSendingComment.set(true);
-        const author = this.authService.currentUser?.name ?? 'Anonimo';
+        const ticketId = this.selectedTicket.id;
 
-        try {
-            this.ticketService.addComment(this.selectedTicket.id, author, text);
-            // Refresca selectedTicket desde el signal
-            this.selectedTicket = this.ticketService.getById(this.selectedTicket.id) ?? this.selectedTicket;
-            this.newComment = '';
-            this.messageService.add({ severity: 'success', summary: 'Comentario agregado', detail: 'Tu comentario fue publicado.', life: 2000 });
-        } catch {
-            this.errorHandler.dispatch('ERR_500_GENERIC');
-        } finally {
-            this.isSendingComment.set(false);
-        }
+        this.ticketService.addComment(ticketId, text).subscribe({
+            next: () => {
+                this.selectedTicket = this.ticketService.getById(ticketId) ?? this.selectedTicket;
+                this.newComment = '';
+                this.messageService.add({
+                    severity: 'success', summary: 'Comentario agregado',
+                    detail: 'Tu comentario fue publicado.', life: 2000,
+                });
+                this.isSendingComment.set(false);
+            },
+            error: () => {
+                this.errorHandler.dispatch('ERR_500_GENERIC');
+                this.isSendingComment.set(false);
+            },
+        });
     }
 
     openCreate(): void {
-        if (!this.permissions.can('create')) {
+        if (!this.permissions.hasPermission('create_tickets')) {
             this.errorHandler.dispatchPermissionError();
             return;
         }
-        this.draft = this.emptyDraft();
-        this.editingId = null;
-        this.submitted = false;
+        this.draft           = this.emptyDraft();
+        this.editingId       = null;
+        this.submitted       = false;
         this.availableMembers = [];
-        this.formVisible = true;
+        this.formVisible     = true;
     }
 
     cancelForm(): void {
-        this.submitted = false;
+        this.submitted   = false;
         this.formVisible = false;
     }
 
     openEdit(ticket: Ticket): void {
-        if (!this.permissions.can('edit')) {
+        if (!this.permissions.hasPermission('edit_tickets')) {
             this.errorHandler.dispatchPermissionError();
             return;
         }
@@ -167,61 +179,81 @@ export class TicketsPage {
             groupId: ticket.groupId, groupName: ticket.groupName,
             createdAt: ticket.createdAt, dueDate: ticket.dueDate,
         };
-        this.editingId = ticket.id;
-        this.submitted = false;
-        const group = this.groups().find(g => g.id === ticket.groupId);
+        this.editingId       = ticket.id;
+        this.submitted       = false;
+        const group          = this.groups().find(g => g.id === ticket.groupId);
         this.availableMembers = group?.memberList ?? [];
-        this.detailVisible = false;
-        this.formVisible = true;
+        this.detailVisible   = false;
+        this.formVisible     = true;
     }
 
     save(): void {
         this.submitted = true;
         if (!this.draft.titulo.trim()) {
-            this.messageService.add({ severity: 'warn', summary: 'Campo requerido', detail: 'El título del ticket es obligatorio.', life: 3000 });
+            this.messageService.add({
+                severity: 'warn', summary: 'Campo requerido',
+                detail: 'El título del ticket es obligatorio.', life: 3000,
+            });
             return;
         }
         if (!this.draft.groupId) {
-            this.messageService.add({ severity: 'warn', summary: 'Campo requerido', detail: 'Selecciona un grupo.', life: 3000 });
+            this.messageService.add({
+                severity: 'warn', summary: 'Campo requerido',
+                detail: 'Selecciona un grupo.', life: 3000,
+            });
             return;
         }
         if (this.isSaving()) return;
 
         this.isSaving.set(true);
-        const userName = this.authService.currentUser?.name ?? 'Sistema';
 
-        try {
-            if (this.editingId) {
-                this.ticketService.update(this.editingId, { ...this.draft }, userName);
-                this.messageService.add({ severity: 'success', summary: 'Ticket actualizado', detail: `«${this.draft.titulo}» actualizado.`, life: 3000 });
-            } else {
-                this.ticketService.create({ ...this.draft });
-                this.messageService.add({ severity: 'success', summary: 'Ticket creado', detail: `«${this.draft.titulo}» creado.`, life: 3000 });
-            }
-            this.formVisible = false;
-            this.submitted = false;
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : 'Error desconocido';
-            this.errorHandler.dispatch('ERR_500_GENERIC', msg);
-        } finally {
-            this.isSaving.set(false);
-        }
+        const op$ = this.editingId
+            ? this.ticketService.updateTicket(this.editingId, { ...this.draft })
+            : this.ticketService.createTicket({ ...this.draft });
+
+        op$.subscribe({
+            next: () => {
+                const label = this.editingId ? 'actualizado' : 'creado';
+                this.messageService.add({
+                    severity: 'success',
+                    summary:  `Ticket ${label}`,
+                    detail:   `«${this.draft.titulo}» ${label}.`,
+                    life: 3000,
+                });
+                this.formVisible = false;
+                this.submitted   = false;
+                this.isSaving.set(false);
+            },
+            error: (err) => {
+                const msg = err?.error?.message ?? err?.message ?? 'Error desconocido';
+                this.errorHandler.dispatch('ERR_500_GENERIC', msg);
+                this.isSaving.set(false);
+            },
+        });
     }
 
     confirmDelete(ticket: Ticket): void {
-        if (!this.permissions.can('delete')) {
+        if (!this.permissions.hasPermission('delete_tickets')) {
             this.errorHandler.dispatchPermissionError();
             return;
         }
         this.confirmationService.confirm({
             message: `¿Eliminar "${ticket.titulo}"? Esta acción no se puede deshacer.`,
-            header: 'Confirmar eliminación',
-            icon: 'pi pi-exclamation-triangle',
+            header:  'Confirmar eliminación',
+            icon:    'pi pi-exclamation-triangle',
             acceptLabel: 'Eliminar',
             rejectLabel: 'Cancelar',
             accept: () => {
-                this.ticketService.remove(ticket.id);
-                this.messageService.add({ severity: 'info', summary: 'Eliminado', detail: `"${ticket.titulo}" eliminado.`, life: 3000 });
+                this.ticketService.deleteTicket(ticket.id).subscribe({
+                    next: () => this.messageService.add({
+                        severity: 'info', summary: 'Eliminado',
+                        detail: `"${ticket.titulo}" eliminado.`, life: 3000,
+                    }),
+                    error: () => this.messageService.add({
+                        severity: 'error', summary: 'Error',
+                        detail: 'No se pudo eliminar el ticket.', life: 4000,
+                    }),
+                });
             },
         });
     }

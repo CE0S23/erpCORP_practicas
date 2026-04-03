@@ -1,4 +1,5 @@
 import {
+  APP_INITIALIZER,
   ApplicationConfig,
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
@@ -6,12 +7,15 @@ import {
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { provideHttpClient, withFetch } from '@angular/common/http';
+import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { providePrimeNG } from 'primeng/config';
 import { MessageService } from 'primeng/api';
 import Aura from '@primeuix/themes/aura';
 
 import { routes } from './app.routes';
+import { authInterceptor } from './interceptors/auth.interceptor';
+import { errorInterceptor } from './services/error.interceptor';
+import { AuthService } from './services/auth.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -19,16 +23,20 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideRouter(routes, withComponentInputBinding()),
     provideClientHydration(withEventReplay()),
-    provideHttpClient(withFetch()),
+    provideHttpClient(withFetch(), withInterceptors([authInterceptor, errorInterceptor])),
     provideAnimationsAsync(),
     MessageService,
     providePrimeNG({
       theme: {
         preset: Aura,
-        options: {
-          darkModeSelector: 'none',
-        },
+        options: { darkModeSelector: 'none' },
       },
     }),
+    {
+      provide: APP_INITIALIZER,
+      useFactory: (authService: AuthService) => () => authService.initAuth(),
+      deps: [AuthService],
+      multi: true,
+    },
   ],
 };

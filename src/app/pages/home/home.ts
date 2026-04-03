@@ -49,7 +49,7 @@ export class Home implements OnInit {
             this.chartData = this.utils.buildChartData(s.pendiente, s.enProgreso, s.revision, s.finalizado);
         }
 
-        const user = this.authService.currentUser;
+        const user = this.authService.currentUser();
         if (user) {
             this.messageService.add({
                 severity: 'success',

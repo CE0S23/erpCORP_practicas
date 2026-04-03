@@ -1,141 +1,207 @@
-import { Injectable, signal } from '@angular/core';
-import { BehaviorSubject, Observable, of } from 'rxjs';
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { Observable, of, firstValueFrom } from 'rxjs';
+import { tap, switchMap, map, catchError } from 'rxjs/operators';
 import {
     ApiResponse, AuthState, HardcodedCredential,
     LoginRequest, RegisterRequest, User,
     createUserWithDefaultPermissions,
 } from '../models/user.model';
-import { Permission, ROLE_DEFAULT_PERMISSIONS } from '../models/role.model';
+import { Permission, AppRole, ROLE_DEFAULT_PERMISSIONS } from '../models/role.model';
+import { environment } from '../../environments/environment';
 
-/** Catalogo central de usuarios hardcodeados (simula base de datos) */
-export const SYSTEM_USERS = signal<User[]>([
-    createUserWithDefaultPermissions({
-        id: 'sa1',
-        username: 'super_admin',
-        name: 'Super Admin',
-        email: 'super@erp.com',
-        role: 'superAdmin',
-    }),
-    createUserWithDefaultPermissions({
-        id: 'u_admin',
-        username: 'admin_erp',
-        name: 'Admin ERP',
-        email: 'admin@erp.com',
-        role: 'admin',
-    }),
-    createUserWithDefaultPermissions({
-        id: 'u_medium',
-        username: 'medium_erp',
-        name: 'Medium User',
-        email: 'medium@erp.com',
-        role: 'medium',
-    }),
-    createUserWithDefaultPermissions({
-        id: 'u_cesar',
-        username: 'cesar_ramirez',
-        name: 'Cesar Ramirez',
-        email: 'cesar@erp.com',
-        role: 'user',
-    }),
-]);
+const TOKEN_KEY = 'erp_token';
 
-const HARDCODED_CREDENTIALS: Array<{ email: string; password: string; userId: string }> = [
-    { email: 'super@erp.com',  password: 'Super@Secure1',  userId: 'sa1' },
-    { email: 'admin@erp.com',  password: 'Admin@Secure1',  userId: 'u_admin' },
-    { email: 'medium@erp.com', password: 'Medium@Secure1', userId: 'u_medium' },
-    { email: 'cesar@erp.com',  password: 'Cesar@Secure1',  userId: 'u_cesar' },
-];
+/** Catálogo reactivo de usuarios del sistema (compatibilidad con componentes existentes) */
+export const SYSTEM_USERS = signal<User[]>([]);
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-    private readonly initialState: AuthState = { user: null, isAuthenticated: false, token: null };
-    private readonly authState$ = new BehaviorSubject<AuthState>(this.initialState);
-    readonly authState: Observable<AuthState> = this.authState$.asObservable();
+    private readonly http   = inject(HttpClient);
+    private readonly router = inject(Router);
+    private readonly apiUrl = environment.apiUrl;
 
-    get currentUser(): User | null { return this.authState$.value.user; }
-    get isAuthenticated(): boolean { return this.authState$.value.isAuthenticated; }
+    /** Signal con el usuario en sesión */
+    readonly currentUser = signal<User | null>(null);
 
-    login(credentials: LoginRequest): Observable<ApiResponse<User>> {
-        const cred = HARDCODED_CREDENTIALS.find(
-            c => c.email.toLowerCase() === credentials.email.toLowerCase()
-                && c.password === credentials.password
+    /** Signal con el estado completo de autenticación */
+    readonly authState = signal<AuthState>({
+        user: null,
+        isAuthenticated: false,
+        token: null,
+        loading: false,
+    });
+
+    // ── Login ──────────────────────────────────────────────────────────────────
+
+    login(email: string, password: string): Observable<void> {
+        this.authState.update(s => ({ ...s, loading: true }));
+
+        return this.http.post<{ token?: string; access_token?: string }>(
+            `${this.apiUrl}/auth/login`, { email, password }
+        ).pipe(
+            tap(res => {
+                const token = res.token ?? res.access_token ?? '';
+                localStorage.setItem(TOKEN_KEY, token);
+            }),
+            switchMap(() => this.me()),
+            tap(() => this.router.navigate(['/home/dashboard-all'])),
+            map(() => void 0 as void),
+            catchError(err => {
+                this.authState.update(s => ({ ...s, loading: false }));
+                throw err;
+            })
         );
-        if (!cred) {
-            return of<ApiResponse<User>>({ success: false, message: 'Credenciales incorrectas.' });
-        }
-
-        const user = SYSTEM_USERS().find(u => u.id === cred.userId);
-        if (!user) {
-            return of<ApiResponse<User>>({ success: false, message: 'Usuario no encontrado en el sistema.' });
-        }
-        if (!user.enabled) {
-            return of<ApiResponse<User>>({ success: false, message: 'Tu cuenta ha sido deshabilitada. Contacta al administrador.' });
-        }
-
-        this.authState$.next({ user, isAuthenticated: true, token: `token-${user.id}-${Date.now()}` });
-        return of<ApiResponse<User>>({ success: true, message: 'Login exitoso.', data: user });
     }
 
-    register(userData: RegisterRequest): Observable<ApiResponse<User>> {
-        const emailTaken = SYSTEM_USERS().some(u => u.email === userData.email);
-        if (emailTaken) {
-            return of<ApiResponse<User>>({ success: false, message: 'Ya existe una cuenta con ese correo.' });
-        }
+    // ── Logout ─────────────────────────────────────────────────────────────────
 
-        const newUser = createUserWithDefaultPermissions({
-            id: `reg-${Date.now()}`,
-            username: userData.username,
-            name: userData.name,
-            email: userData.email,
-            role: 'user',
-        });
-
-        SYSTEM_USERS.update(list => [...list, newUser]);
-        this.authState$.next({ user: newUser, isAuthenticated: true, token: `token-${newUser.id}` });
-        return of<ApiResponse<User>>({ success: true, message: 'Cuenta creada exitosamente.', data: newUser });
+    logout(): Observable<void> {
+        return this.http.post<void>(`${this.apiUrl}/auth/logout`, {}).pipe(
+            tap({ next: () => this._clearSession(), error: () => this._clearSession() }),
+            map(() => void 0 as void),
+            catchError(() => {
+                this._clearSession();
+                return of(void 0 as void);
+            })
+        );
     }
 
-    /** Actualiza los permisos de un usuario en el catalogo global */
+    // ── Register ───────────────────────────────────────────────────────────────
+
+    register(data: RegisterRequest): Observable<ApiResponse<User>> {
+        return this.http.post<any>(`${this.apiUrl}/api/users`, data).pipe(
+            map(dto => ({
+                success: true as const,
+                message: 'Usuario creado correctamente.',
+                data: this._mapDtoToUser(dto),
+            })),
+            catchError(err => {
+                const message = err?.error?.message ?? 'Error al crear la cuenta.';
+                return of({ success: false as const, message } as ApiResponse<User>);
+            })
+        );
+    }
+
+    // ── Me ─────────────────────────────────────────────────────────────────────
+
+    me(): Observable<User> {
+        return this.http.get<any>(`${this.apiUrl}/auth/me`).pipe(
+            map(dto => this._mapDtoToUser(dto)),
+            tap(user => {
+                this.currentUser.set(user);
+                this.authState.set({
+                    user,
+                    isAuthenticated: true,
+                    token: localStorage.getItem(TOKEN_KEY),
+                    loading: false,
+                });
+                // Actualiza el usuario en SYSTEM_USERS si ya existe
+                SYSTEM_USERS.update(list => {
+                    const exists = list.some(u => u.id === user.id);
+                    return exists ? list.map(u => u.id === user.id ? user : u) : [...list, user];
+                });
+            })
+        );
+    }
+
+    // ── Init (APP_INITIALIZER) ─────────────────────────────────────────────────
+
+    async initAuth(): Promise<void> {
+        if (!localStorage.getItem(TOKEN_KEY)) return;
+
+        try {
+            await firstValueFrom(this.me());
+            // Carga lista de usuarios para funciones admin (falla en silencio)
+            this.loadUsers().subscribe();
+        } catch {
+            localStorage.removeItem(TOKEN_KEY);
+        }
+    }
+
+    // ── Carga de usuarios (admin) ──────────────────────────────────────────────
+
+    loadUsers(): Observable<User[]> {
+        return this.http.get<any[]>(`${this.apiUrl}/api/users`).pipe(
+            map(dtos => dtos.map(dto => this._mapDtoToUser(dto))),
+            tap(users => SYSTEM_USERS.set(users)),
+            catchError(() => of([] as User[]))
+        );
+    }
+
+    // ── Helpers de permisos ────────────────────────────────────────────────────
+
+    hasPermission(permission: string): boolean {
+        const user = this.currentUser();
+        if (!user?.enabled) return false;
+        return user.permissions?.includes(permission as Permission) ?? false;
+    }
+
+    hasRole(role: AppRole): boolean {
+        const user = this.currentUser();
+        if (!user) return false;
+        const hierarchy: Record<AppRole, number> = {
+            superAdmin: 1, admin: 2, medium: 3, user: 4,
+        };
+        return (hierarchy[user.role] ?? 99) <= (hierarchy[role] ?? 99);
+    }
+
+    // ── Gestión local de usuarios (compatibilidad con página Usuarios) ─────────
+
     updateUserPermissions(userId: string, permissions: Permission[]): void {
         SYSTEM_USERS.update(list =>
             list.map(u => u.id === userId ? { ...u, permissions } : u)
         );
-        // Si es el usuario actual, actualizar su sesion
-        if (this.currentUser?.id === userId) {
+        if (this.currentUser()?.id === userId) {
             const updated = SYSTEM_USERS().find(u => u.id === userId);
             if (updated) {
-                this.authState$.next({ ...this.authState$.value, user: updated });
+                this.currentUser.set(updated);
+                this.authState.update(s => ({ ...s, user: updated }));
             }
         }
     }
 
-    /** Habilita o deshabilita una cuenta de usuario */
     toggleUserEnabled(userId: string): void {
         SYSTEM_USERS.update(list =>
             list.map(u => u.id === userId ? { ...u, enabled: !u.enabled } : u)
         );
     }
 
-    /** Crea un nuevo usuario desde el panel de administracion */
     createUser(data: Omit<User, 'id' | 'permissions' | 'enabled'>): Observable<ApiResponse<User>> {
         const emailTaken = SYSTEM_USERS().some(u => u.email === data.email);
         if (emailTaken) {
             return of<ApiResponse<User>>({ success: false, message: 'Ya existe un usuario con ese correo.' });
         }
-        const newUser = createUserWithDefaultPermissions({
-            id: `usr-${Date.now()}`,
-            ...data,
-        });
+        const newUser = createUserWithDefaultPermissions({ id: `usr-${Date.now()}`, ...data });
         SYSTEM_USERS.update(list => [...list, newUser]);
         return of<ApiResponse<User>>({ success: true, message: 'Usuario creado correctamente.', data: newUser });
     }
 
-    /** Elimina un usuario del sistema */
     deleteUser(userId: string): void {
         SYSTEM_USERS.update(list => list.filter(u => u.id !== userId));
     }
 
-    logout(): void {
-        this.authState$.next(this.initialState);
+    // ── Privados ───────────────────────────────────────────────────────────────
+
+    private _clearSession(): void {
+        localStorage.removeItem(TOKEN_KEY);
+        this.currentUser.set(null);
+        this.authState.set({ user: null, isAuthenticated: false, token: null, loading: false });
+        this.router.navigate(['/login']);
+    }
+
+    private _mapDtoToUser(dto: any): User {
+        const role = (dto.role ?? dto.roles?.[0]?.name ?? 'user') as AppRole;
+        return {
+            id:          dto.id,
+            username:    dto.username ?? dto.email?.split('@')[0] ?? '',
+            name:        dto.name,
+            email:       dto.email,
+            role,
+            permissions: dto.permissions ?? ROLE_DEFAULT_PERMISSIONS[role] ?? [],
+            enabled:     dto.isActive ?? dto.enabled ?? dto.is_active ?? true,
+            avatarUrl:   dto.avatarUrl ?? dto.avatar_url,
+        };
     }
 }

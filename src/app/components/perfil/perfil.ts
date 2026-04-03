@@ -23,25 +23,25 @@ export class Perfil {
     readonly utils = inject(TicketUtilsService);
     readonly permissions = inject(PermissionService);
 
-    readonly user = this.authService.currentUser;
+    readonly user = this.authService.currentUser;  // Signal<User|null>
     readonly allPermissions: Permission[] = ALL_PERMISSIONS;
     readonly permissionLabels = PERMISSION_LABELS;
     readonly permissionIcons = PERMISSION_ICONS;
 
     readonly userGroup = computed(() => {
-        if (!this.user) return null;
+        if (!this.user()) return null;
         return this.groupService.groups().find(g =>
-            g.memberList.some(m => m.id === this.user!.id)
+            g.memberList.some(m => m.id === this.user()!.id)
         ) ?? null;
     });
 
     readonly initials = computed(() => {
-        const name = this.user?.name ?? '';
+        const name = this.user()?.name ?? '';
         return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
     });
 
     readonly roleSeverity = computed((): 'danger' | 'warn' | 'info' | 'success' | 'secondary' => {
-        switch (this.user?.role) {
+        switch (this.user()?.role) {
             case 'superAdmin': return 'danger';
             case 'admin':      return 'warn';
             case 'medium':     return 'info';
@@ -50,7 +50,7 @@ export class Perfil {
     });
 
     readonly roleLabel = computed(() => {
-        switch (this.user?.role) {
+        switch (this.user()?.role) {
             case 'superAdmin': return 'Super Admin';
             case 'admin':      return 'Administrador';
             case 'medium':     return 'Editor';
@@ -60,9 +60,9 @@ export class Perfil {
 
     /** Tickets asignados al usuario actual */
     readonly myTickets = computed(() => {
-        if (!this.user) return [];
+        if (!this.user()) return [];
         return this.ticketService.tickets().filter(
-            t => t.assignedTo === this.user!.id || t.assignedName === this.user!.name
+            t => t.assignedTo === this.user()!.id || t.assignedName === this.user()!.name
         );
     });
 
@@ -80,7 +80,7 @@ export class Perfil {
 
     /** Verifica si el usuario tiene un permiso especifico */
     hasPermission(permission: Permission): boolean {
-        return this.user?.permissions?.includes(permission) ?? false;
+        return this.user()?.permissions?.includes(permission) ?? false;
     }
 
     statusSeverity(s: TicketStatus) { return this.utils.statusSeverity(s); }

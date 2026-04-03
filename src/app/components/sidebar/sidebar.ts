@@ -4,7 +4,15 @@ import { CommonModule } from '@angular/common';
 import { APP_PATHS } from '../../app.paths';
 import { AuthService } from '../../services/auth.service';
 import { PermissionService } from '../../services/permission.service';
-import { PERMISSION_LABELS, PERMISSION_ICONS } from '../../models/role.model';
+import { PERMISSION_LABELS, PERMISSION_ICONS, AppPermission } from '../../models/role.model';
+
+interface NavItem {
+    label: string;
+    icon: string;
+    route: string;
+    adminOnly?: boolean;
+    requiredPermission?: AppPermission | null;
+}
 
 @Component({
     selector: 'app-sidebar',
@@ -17,34 +25,48 @@ export class Sidebar {
     @Input() version = '1.0.0';
 
     private readonly authService = inject(AuthService);
-    private readonly router = inject(Router);
-    readonly permissions = inject(PermissionService);
+    private readonly router      = inject(Router);
+    readonly permissions         = inject(PermissionService);
 
     collapsed = false;
-    readonly paths = APP_PATHS;
-    readonly searchTerm = signal('');
+    readonly paths            = APP_PATHS;
+    readonly searchTerm       = signal('');
     readonly permissionLabels = PERMISSION_LABELS;
-    readonly permissionIcons = PERMISSION_ICONS;
+    readonly permissionIcons  = PERMISSION_ICONS;
 
-    readonly currentUser = computed(() => this.authService.currentUser);
+    readonly currentUser = computed(() => this.authService.currentUser());
 
     readonly userInitials = computed(() => {
-        const name = this.authService.currentUser?.name ?? '';
+        const name = this.authService.currentUser()?.name ?? '';
         return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
     });
 
-    readonly navItems = [
-        { label: 'Dashboard',  icon: 'pi pi-chart-bar', route: APP_PATHS.dashboard },
-        { label: 'Tickets',    icon: 'pi pi-ticket',    route: APP_PATHS.tickets },
-        { label: 'Grupos',     icon: 'pi pi-users',     route: APP_PATHS.group },
-        { label: 'Usuarios',   icon: 'pi pi-user',      route: APP_PATHS.usuarios },
-        { label: 'Mi Perfil',  icon: 'pi pi-id-card',   route: APP_PATHS.perfil },
+    private readonly allNavItems: NavItem[] = [
+        { label: 'Dashboard', icon: 'pi pi-chart-bar', route: APP_PATHS.dashboardAll, requiredPermission: null },
+        { label: 'Tickets',   icon: 'pi pi-ticket',    route: APP_PATHS.tickets,      requiredPermission: AppPermission.VIEW_TICKETS },
+        { label: 'Grupos',    icon: 'pi pi-users',     route: APP_PATHS.group,        requiredPermission: AppPermission.VIEW_GROUPS },
+        { label: 'Usuarios',  icon: 'pi pi-user',      route: APP_PATHS.usuarios,     requiredPermission: null, adminOnly: true },
+        { label: 'Mi Perfil', icon: 'pi pi-id-card',   route: APP_PATHS.perfil,       requiredPermission: null },
     ];
+
+    readonly navItems = computed<NavItem[]>(() => {
+        const user    = this.authService.currentUser();
+        const isAdmin = this.permissions.isAdmin;
+
+        return this.allNavItems.filter(item => {
+            if (item.adminOnly && !isAdmin) return false;
+            if (item.requiredPermission === null) return true;
+            if (item.requiredPermission) {
+                return user?.permissions?.includes(item.requiredPermission) ?? false;
+            }
+            return true;
+        });
+    });
 
     readonly filteredNavItems = computed(() => {
         const term = this.searchTerm().toLowerCase().trim();
-        if (!term) return this.navItems;
-        return this.navItems.filter(item => item.label.toLowerCase().includes(term));
+        if (!term) return this.navItems();
+        return this.navItems().filter(item => item.label.toLowerCase().includes(term));
     });
 
     get isInsideHome(): boolean {
@@ -56,7 +78,6 @@ export class Sidebar {
     }
 
     logout(): void {
-        this.authService.logout();
-        this.router.navigate([APP_PATHS.login]);
+        this.authService.logout().subscribe();
     }
 }

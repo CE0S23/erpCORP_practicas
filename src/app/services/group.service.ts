@@ -1,105 +1,240 @@
-import { Injectable, signal } from '@angular/core';
-import { Group, GroupCategory, GroupLevel, GroupMember } from '../models/group.model';
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable, tap, map, catchError, of } from 'rxjs';
+import {
+    Group, GroupMember, GroupCategory, GroupLevel,
+    LEVEL_FROM_API, LEVEL_TO_API, ApiGroupLevel,
+} from '../models/group.model';
+import { ApiResponse } from '../models/user.model';
+import { environment } from '../../environments/environment';
+
+export interface GroupFilters {
+    category_id?: string;
+    level?:       string;
+    is_active?:   boolean;
+    page?:        number;
+    limit?:       number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class GroupService {
-    private readonly _groups = signal<Group[]>([
-        {
-            id: '1',
-            nombre: 'Alpha Team',
-            categoria: 'Desarrollo',
-            nivel: 'Senior',
-            autor: 'Admin ERP',
-            miembros: 3,
-            tickets: 14,
-            memberList: [
-                { id: 'u1', username: 'juan_dev', name: 'Juan Developer', email: 'juan@erp.com', role: 'user' },
-                { id: 'u2', username: 'ana_dev', name: 'Ana Frontend', email: 'ana@erp.com', role: 'user' },
-                { id: 'u3', username: 'admin_erp', name: 'Admin ERP', email: 'admin@erp.com', role: 'admin' },
-            ],
-        },
-        {
-            id: '2',
-            nombre: 'Design Hub',
-            categoria: 'Diseño',
-            nivel: 'Mid',
-            autor: 'César Ramírez',
-            miembros: 2,
-            tickets: 6,
-            memberList: [
-                { id: 'u4', username: 'maria_ux', name: 'María UX', email: 'maria@erp.com', role: 'user' },
-                { id: 'u5', username: 'pedro_ui', name: 'Pedro UI', email: 'pedro@erp.com', role: 'user' },
-            ],
-        },
-        {
-            id: '3',
-            nombre: 'Support Core',
-            categoria: 'Soporte',
-            nivel: 'Junior',
-            autor: 'Admin ERP',
-            miembros: 3,
-            tickets: 30,
-            memberList: [
-                { id: 'u6', username: 'luis_support', name: 'Luis Soporte', email: 'luis@erp.com', role: 'user' },
-                { id: 'u7', username: 'carla_ops', name: 'Carla Ops', email: 'carla@erp.com', role: 'user' },
-                { id: 'u8', username: 'jorge_help', name: 'Jorge Helpdesk', email: 'jorge@erp.com', role: 'user' },
-            ],
-        },
-    ]);
+    private readonly http   = inject(HttpClient);
+    private readonly apiUrl = environment.apiUrl;
 
-    readonly groups = this._groups.asReadonly();
+    // ── Estado reactivo local ──────────────────────────────────────────────────
+    private readonly _groups     = signal<Group[]>([]);
+    private readonly _categories = signal<GroupCategory[]>([]);
 
-    create(group: Omit<Group, 'id'>): void {
-        const id = Date.now().toString();
-        this._groups.update(list => [...list, { ...group, id }]);
-    }
+    readonly groups     = this._groups.asReadonly();
+    readonly categories = this._categories.asReadonly();
+    readonly levels: GroupLevel[] = ['Junior', 'Mid', 'Senior', 'Lead'];
 
-    update(id: string, changes: Partial<Omit<Group, 'id'>>): void {
-        this._groups.update(list =>
-            list.map(g => (g.id === id ? { ...g, ...changes } : g))
+    // ── Grupos ─────────────────────────────────────────────────────────────────
+
+    getGroups(filters?: GroupFilters): Observable<ApiResponse<Group[]>> {
+        let params = new HttpParams();
+        if (filters?.category_id) params = params.set('category_id', filters.category_id);
+        if (filters?.level)       params = params.set('level',       filters.level);
+        if (filters?.is_active != null) params = params.set('is_active', String(filters.is_active));
+        if (filters?.page)        params = params.set('page',        filters.page);
+        if (filters?.limit)       params = params.set('limit',       filters.limit);
+
+        return this.http.get<any>(`${this.apiUrl}/api/groups`, { params }).pipe(
+            map(response => {
+                const rawList = Array.isArray(response) ? response
+                    : (response.data ?? response.items ?? response.groups ?? []);
+                const groups = rawList.map((dto: any) => this._mapFromApi(dto));
+                this._groups.set(groups);
+                return { success: true, message: 'OK', data: groups } as ApiResponse<Group[]>;
+            })
         );
     }
 
-    remove(id: string): void {
-        this._groups.update(list => list.filter(g => g.id !== id));
+    getGroup(id: string): Observable<Group> {
+        return this.http.get<any>(`${this.apiUrl}/api/groups/${id}`).pipe(
+            map(dto => this._mapFromApi(dto))
+        );
     }
 
-    /** Retorna miembros de un grupo específico */
+    createGroup(data: Partial<Group>): Observable<Group> {
+        return this.http.post<any>(`${this.apiUrl}/api/groups`, this._mapToApi(data)).pipe(
+            map(dto => this._mapFromApi(dto)),
+            tap(group => this._groups.update(list => [...list, group]))
+        );
+    }
+
+    updateGroup(id: string, data: Partial<Group>): Observable<Group> {
+        return this.http.patch<any>(`${this.apiUrl}/api/groups/${id}`, this._mapToApi(data)).pipe(
+            map(dto => this._mapFromApi(dto)),
+            tap(group => this._groups.update(list => list.map(g => g.id === id ? group : g)))
+        );
+    }
+
+    deleteGroup(id: string): Observable<void> {
+        return this.http.delete<void>(`${this.apiUrl}/api/groups/${id}`).pipe(
+            tap(() => this._groups.update(list => list.filter(g => g.id !== id)))
+        );
+    }
+
+    // ── Miembros ───────────────────────────────────────────────────────────────
+
+    getMembers(groupId: string): Observable<GroupMember[]> {
+        return this.http.get<any[]>(`${this.apiUrl}/api/groups/${groupId}/members`).pipe(
+            map(dtos => dtos.map(d => this._mapMember(d)))
+        );
+    }
+
+    addMember(groupId: string, userId: string, role = 'member'): Observable<GroupMember> {
+        return this.http.post<any>(
+            `${this.apiUrl}/api/groups/${groupId}/members`, { user_id: userId, role }
+        ).pipe(
+            map(dto => this._mapMember(dto)),
+            tap(member => {
+                this._groups.update(list => list.map(g =>
+                    g.id === groupId
+                        ? {
+                            ...g,
+                            memberList: [...g.memberList, member],
+                            miembros: g.miembros + 1,
+                          }
+                        : g
+                ));
+            })
+        );
+    }
+
+    removeMember(groupId: string, userId: string): Observable<void> {
+        return this.http.delete<void>(
+            `${this.apiUrl}/api/groups/${groupId}/members/${userId}`
+        ).pipe(
+            tap(() => {
+                this._groups.update(list => list.map(g =>
+                    g.id === groupId
+                        ? {
+                            ...g,
+                            memberList: g.memberList.filter(m => m.id !== userId),
+                            miembros: Math.max(0, g.miembros - 1),
+                          }
+                        : g
+                ));
+            })
+        );
+    }
+
+    updateMemberRole(groupId: string, userId: string, role: string): Observable<GroupMember> {
+        return this.http.patch<any>(
+            `${this.apiUrl}/api/groups/${groupId}/members/${userId}`, { role }
+        ).pipe(
+            map(dto => this._mapMember(dto)),
+            tap(updated => {
+                this._groups.update(list => list.map(g =>
+                    g.id === groupId
+                        ? { ...g, memberList: g.memberList.map(m => m.id === userId ? updated : m) }
+                        : g
+                ));
+            })
+        );
+    }
+
+    // ── Categorías ─────────────────────────────────────────────────────────────
+
+    getCategories(): Observable<GroupCategory[]> {
+        return this.http.get<any[]>(`${this.apiUrl}/api/categories`).pipe(
+            map(dtos => dtos.map(d => ({ id: d.id, name: d.name, color: d.color }))),
+            tap(cats => this._categories.set(cats)),
+            catchError(() => of([] as GroupCategory[]))
+        );
+    }
+
+    createCategory(name: string, color: string): Observable<GroupCategory> {
+        return this.http.post<any>(`${this.apiUrl}/api/categories`, { name, color }).pipe(
+            map(dto => ({ id: dto.id, name: dto.name, color: dto.color })),
+            tap(cat => this._categories.update(list => [...list, cat]))
+        );
+    }
+
+    // ── Helpers síncronos (usan señal local) ───────────────────────────────────
+
     getMembersByGroupId(groupId: string): GroupMember[] {
         return this._groups().find(g => g.id === groupId)?.memberList ?? [];
     }
 
-    /** Verifica si un usuario pertenece al grupo indicado */
     isMemberOfGroup(userId: string, groupId: string): boolean {
         return this.getMembersByGroupId(groupId).some(m => m.id === userId);
     }
 
-    addMember(groupId: string, member: Omit<GroupMember, 'id'>): void {
-        const id = `u${Date.now()}`;
-        const newMember: GroupMember = { ...member, id };
-        this._groups.update(list =>
-            list.map(g =>
-                g.id === groupId
-                    ? { ...g, memberList: [...g.memberList, newMember], miembros: g.miembros + 1 }
-                    : g
-            )
-        );
+    /** Alias para compatibilidad con group.ts */
+    create(data: Omit<Group, 'id'>): Observable<Group> {
+        return this.createGroup(data);
     }
 
-    removeMember(groupId: string, memberId: string): void {
-        this._groups.update(list =>
-            list.map(g =>
-                g.id === groupId
-                    ? {
-                          ...g,
-                          memberList: g.memberList.filter(m => m.id !== memberId),
-                          miembros: Math.max(0, g.miembros - 1),
-                      }
-                    : g
-            )
-        );
+    update(id: string, changes: Partial<Omit<Group, 'id'>>): Observable<Group> {
+        return this.updateGroup(id, changes);
     }
 
-    readonly categories: GroupCategory[] = ['Desarrollo', 'Diseño', 'Marketing', 'Soporte', 'Operaciones'];
-    readonly levels: GroupLevel[] = ['Junior', 'Mid', 'Senior', 'Lead'];
+    remove(id: string): Observable<void> {
+        return this.deleteGroup(id);
+    }
+
+    addMemberCompat(groupId: string, member: Omit<GroupMember, 'id'> & { id?: string }): Observable<GroupMember> {
+        const userId = member.id ?? '';
+        const role   = member.role === 'admin' ? 'admin' : 'member';
+        if (userId) {
+            return this.addMember(groupId, userId, role);
+        }
+        // fallback: actualización local si no hay id real
+        const newMember: GroupMember = { ...member, id: `u${Date.now()}` };
+        this._groups.update(list => list.map(g =>
+            g.id === groupId
+                ? { ...g, memberList: [...g.memberList, newMember], miembros: g.miembros + 1 }
+                : g
+        ));
+        return of(newMember);
+    }
+
+    removeMemberCompat(groupId: string, memberId: string): Observable<void> {
+        return this.removeMember(groupId, memberId);
+    }
+
+    // ── Mapeo API ↔ UI ─────────────────────────────────────────────────────────
+
+    private _mapFromApi(dto: any): Group {
+        return {
+            id:          dto.id,
+            nombre:      dto.name     ?? dto.nombre     ?? '',
+            categoria:   dto.category?.name ?? dto.categoria ?? '',
+            categoriaId: dto.category_id   ?? dto.category?.id,
+            nivel:       LEVEL_FROM_API[dto.level as ApiGroupLevel] ?? (dto.nivel as GroupLevel) ?? 'Junior',
+            autor:       dto.created_by?.name ?? dto.autor ?? '',
+            miembros:    dto.members?.length  ?? dto.miembros  ?? 0,
+            tickets:     dto.tickets_count    ?? dto.tickets    ?? 0,
+            memberList:  (dto.members ?? dto.memberList ?? []).map((m: any) => this._mapMember(m)),
+            description: dto.description,
+            isActive:    dto.is_active ?? true,
+        };
+    }
+
+    private _mapToApi(group: Partial<Group>): Record<string, unknown> {
+        const out: Record<string, unknown> = {};
+        if (group.nombre      !== undefined) out['name']        = group.nombre;
+        if (group.description !== undefined) out['description'] = group.description;
+        if (group.categoriaId !== undefined) out['category_id'] = group.categoriaId || null;
+        if (group.categoria   !== undefined && !group.categoriaId) {
+            // Intenta resolver el id por nombre
+            const cat = this._categories().find(c => c.name === group.categoria);
+            if (cat) out['category_id'] = cat.id;
+        }
+        if (group.nivel !== undefined) out['level'] = LEVEL_TO_API[group.nivel] ?? 'beginner';
+        return out;
+    }
+
+    private _mapMember(dto: any): GroupMember {
+        return {
+            id:       dto.user_id ?? dto.id,
+            username: dto.user?.email?.split('@')[0] ?? dto.username ?? '',
+            name:     dto.user?.name  ?? dto.name  ?? '',
+            email:    dto.user?.email ?? dto.email ?? '',
+            role:     dto.role === 'admin' || dto.role === 'owner' ? 'admin' : 'user',
+        };
+    }
 }

@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { ToastModule } from 'primeng/toast';
 import { CustomButton } from '../../components/custom-button/custom-button';
@@ -155,7 +155,6 @@ import { APP_PATHS } from '../../app.paths';
 export class Login {
   private readonly fb = inject(FormBuilder);
   private readonly authService = inject(AuthService);
-  private readonly router = inject(Router);
   private readonly messageService = inject(MessageService);
 
   readonly paths = APP_PATHS;
@@ -185,34 +184,20 @@ export class Login {
     }
 
     this.isLoading.set(true);
-    const credentials = this.loginForm.value as LoginRequest;
+    const { email, password } = this.loginForm.value as LoginRequest;
 
-    this.authService.login(credentials).subscribe({
-      next: (response) => {
+    this.authService.login(email!, password!).subscribe({
+      next: () => {
+        // La redirección a /home/dashboard-all la maneja el AuthService
         this.isLoading.set(false);
-        if (response.success) {
-          this.messageService.add({
-            severity: 'success',
-            summary: '¡Bienvenido!',
-            detail: `Sesión iniciada como ${response.data?.name}`,
-            life: 3000,
-          });
-          setTimeout(() => this.router.navigate([this.paths.home]), 800);
-        } else {
-          this.messageService.add({
-            severity: 'error',
-            summary: 'Error de autenticación',
-            detail: response.message,
-            life: 4000,
-          });
-        }
       },
-      error: () => {
+      error: (err) => {
         this.isLoading.set(false);
+        const detail = err?.error?.message ?? err?.message ?? 'Credenciales incorrectas. Intenta nuevamente.';
         this.messageService.add({
           severity: 'error',
-          summary: 'Error inesperado',
-          detail: 'No se pudo conectar. Intenta nuevamente.',
+          summary: 'Error de autenticación',
+          detail,
           life: 4000,
         });
       },

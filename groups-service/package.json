@@ -1,0 +1,22 @@
+{
+  "name": "groups-service",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev":          "node --watch src/server.js",
+    "start":        "node src/server.js",
+    "db:generate":  "prisma generate",
+    "db:push":      "prisma db push",
+    "db:pull":      "prisma db pull"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "dotenv":         "^16.4.5",
+    "fastify":        "^4.28.1",
+    "fastify-plugin": "^4.5.1"
+  },
+  "devDependencies": {
+    "pino-pretty": "^11.2.2",
+    "prisma":      "^5.22.0"
+  }
+}

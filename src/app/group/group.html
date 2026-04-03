@@ -18,7 +18,7 @@
 
   <!-- Tabla de grupos -->
   <p-table
-    [value]="groups()"
+    [value]="visibleGroups()"
     [paginator]="true"
     [rows]="8"
     [rowsPerPageOptions]="[5, 8, 15]"
@@ -28,7 +28,7 @@
     <ng-template pTemplate="caption">
       <div class="table-caption">
         <span class="table-title">Grupos</span>
-        <ng-container *hasPermission="'create'">
+        <ng-container *hasPermission="'create_groups'">
           <p-button label="Nuevo Grupo" icon="pi pi-plus" (onClick)="openCreate()" />
         </ng-container>
       </div>
@@ -64,10 +64,10 @@
         <td>{{ group.tickets }}</td>
         <td (click)="$event.stopPropagation()">
           <div class="row-actions">
-            <ng-container *hasPermission="'edit'">
+            <ng-container *hasPermission="'edit_groups'">
               <p-button icon="pi pi-pencil" [text]="true" [rounded]="true" severity="info" (onClick)="openEdit(group)" pTooltip="Editar" />
             </ng-container>
-            <ng-container *hasPermission="'delete'">
+            <ng-container *hasPermission="'delete_groups'">
               <p-button icon="pi pi-trash" [text]="true" [rounded]="true" severity="danger" (onClick)="confirmDelete(group)" pTooltip="Eliminar" />
             </ng-container>
           </div>
@@ -96,8 +96,14 @@
         <span class="detail-subtitle">{{ selectedGroup()!.categoria }} &middot; {{ selectedGroup()!.nivel }}</span>
       </div>
       <div class="detail-header__actions">
-        <ng-container *hasPermission="'create'">
-          <p-button label="Crear Ticket" icon="pi pi-plus" size="small" (onClick)="null" pTooltip="Abrir formulario de ticket" />
+        <ng-container *hasPermission="'create_tickets'">
+          <p-button
+            label="Crear Ticket"
+            icon="pi pi-plus"
+            size="small"
+            (onClick)="openCreateTicket()"
+            pTooltip="Crear un ticket para este grupo"
+          />
         </ng-container>
         <p-selectButton [options]="viewModeOptions" [(ngModel)]="viewMode" optionLabel="label" optionValue="value" />
       </div>
@@ -238,13 +244,27 @@
 
     <!-- Gestion de miembros -->
     <p-panel header="Gestion de Miembros" [toggleable]="true">
-      <ng-container *hasPermission="'create'">
+      <ng-container *hasPermission="'edit_groups'">
         <div class="add-member-row">
           <div class="add-member-input">
-            <label class="form-label">Anadir miembro por email</label>
-            <input pInputText [(ngModel)]="newMemberEmail" placeholder="usuario@empresa.com" (keydown.enter)="addMember()" />
+            <label class="form-label">Agregar miembro</label>
+            <p-select
+              [options]="availableUserOptions()"
+              [ngModel]="selectedNewMemberId()"
+              (ngModelChange)="selectedNewMemberId.set($event)"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Seleccionar usuario del sistema..."
+              [style]="{ width: '100%' }"
+              appendTo="body"
+            />
           </div>
-          <p-button label="Anadir" icon="pi pi-user-plus" (onClick)="addMember()" />
+          <p-button
+            label="Agregar"
+            icon="pi pi-user-plus"
+            [disabled]="!selectedNewMemberId()"
+            (onClick)="addMember()"
+          />
         </div>
       </ng-container>
 
@@ -257,7 +277,7 @@
             <span class="member-email u-muted u-text-xs">{{ member.email }}</span>
           </div>
           <p-tag [value]="member.role" [severity]="member.role === 'admin' ? 'danger' : 'secondary'" />
-          <ng-container *hasPermission="'delete'">
+          <ng-container *hasPermission="'delete_groups'">
             <p-button icon="pi pi-times" [text]="true" [rounded]="true" severity="danger" size="small"
               (onClick)="removeMember(member)" pTooltip="Eliminar miembro" />
           </ng-container>
@@ -279,10 +299,12 @@
 
 </div>
 
-<!-- CRUD Dialog -->
+<!-- ============================================================ -->
+<!-- Dialog CRUD de Grupos                                         -->
+<!-- ============================================================ -->
 <p-dialog
   [header]="editingId ? 'Editar Grupo' : 'Nuevo Grupo'"
-  [(visible)]="dialogVisible"
+  [(visible)]="groupDialogVisible"
   [modal]="true"
   [style]="{ width: '480px' }"
   [draggable]="false"
@@ -295,11 +317,11 @@
     <div class="form-row">
       <div class="form-field">
         <label class="form-label">Categoria</label>
-        <p-select [options]="categories" [(ngModel)]="draft.categoria" placeholder="Seleccionar" />
+        <p-select [options]="categoryNames()" [(ngModel)]="draft.categoria" placeholder="Seleccionar" appendTo="body" />
       </div>
       <div class="form-field">
         <label class="form-label">Nivel</label>
-        <p-select [options]="levels" [(ngModel)]="draft.nivel" placeholder="Seleccionar" />
+        <p-select [options]="levels" [(ngModel)]="draft.nivel" placeholder="Seleccionar" appendTo="body" />
       </div>
     </div>
     <div class="form-field">
@@ -312,12 +334,100 @@
     @if (isSaving()) {
     <span class="saving-indicator"><i class="pi pi-spin pi-spinner"></i> Guardando...</span>
     }
-    <p-button label="Cancelar" icon="pi pi-times" [text]="true" [disabled]="isSaving()" (onClick)="dialogVisible = false" />
+    <p-button label="Cancelar" icon="pi pi-times" [text]="true" [disabled]="isSaving()" (onClick)="groupDialogVisible = false" />
     <p-button
       [label]="isSaving() ? 'Guardando...' : 'Guardar'"
       [icon]="isSaving() ? 'pi pi-spin pi-spinner' : 'pi pi-check'"
       [disabled]="isSaving()"
       (onClick)="save()"
+    />
+  </ng-template>
+</p-dialog>
+
+<!-- ============================================================ -->
+<!-- Dialog Crear Ticket en grupo seleccionado                     -->
+<!-- ============================================================ -->
+<p-dialog
+  header="Nuevo Ticket"
+  [(visible)]="ticketDialogVisible"
+  [modal]="true"
+  [style]="{ width: '560px' }"
+  [draggable]="false"
+  [closable]="!isSavingTicket()"
+>
+  <div class="group-form">
+
+    <!-- Grupo (solo lectura) -->
+    <div class="form-field">
+      <label class="form-label">Grupo</label>
+      <input pInputText [value]="ticketDraft.groupName" [disabled]="true" />
+    </div>
+
+    <div class="form-field">
+      <label class="form-label">Título <span class="required-star">*</span></label>
+      <input pInputText [(ngModel)]="ticketDraft.titulo" placeholder="Ej. Corregir error en módulo de pagos" />
+    </div>
+
+    <div class="form-field">
+      <label class="form-label">Descripción</label>
+      <textarea pTextarea [(ngModel)]="ticketDraft.descripcion" rows="3" placeholder="Describe el problema o tarea..."></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-field">
+        <label class="form-label">Estado</label>
+        <p-select [options]="statusOptions" [(ngModel)]="ticketDraft.status" placeholder="Seleccionar" optionLabel="label" optionValue="value" appendTo="body" />
+      </div>
+      <div class="form-field">
+        <label class="form-label">Prioridad</label>
+        <p-select [options]="priorityOptions" [(ngModel)]="ticketDraft.priority" placeholder="Seleccionar" optionLabel="label" optionValue="value" appendTo="body" />
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label">Asignado a <span class="form-hint">(miembros del grupo)</span></label>
+      <p-select
+        [options]="memberOptions()"
+        [(ngModel)]="ticketDraft.assignedTo"
+        (onChange)="onTicketMemberChange()"
+        placeholder="Seleccionar miembro (opcional)"
+        optionLabel="label"
+        optionValue="value"
+        appendTo="body"
+        [style]="{ width: '100%' }"
+      />
+      @if (memberOptions().length === 0) {
+        <small class="form-hint-msg"><i class="pi pi-info-circle"></i> Agrega miembros al grupo para poder asignar tickets.</small>
+      }
+    </div>
+
+    <div class="form-row">
+      <div class="form-field">
+        <label class="form-label">Fecha de Creación</label>
+        <p-datepicker [(ngModel)]="ticketDraft.createdAt" dateFormat="dd/mm/yy" [showIcon]="true" />
+      </div>
+      <div class="form-field">
+        <label class="form-label">Fecha Límite</label>
+        <p-datepicker [(ngModel)]="ticketDraft.dueDate" dateFormat="dd/mm/yy" [showIcon]="true" />
+      </div>
+    </div>
+
+  </div>
+
+  <ng-template pTemplate="footer">
+    <p-button
+      label="Cancelar"
+      icon="pi pi-times"
+      severity="secondary"
+      [outlined]="true"
+      [disabled]="isSavingTicket()"
+      (onClick)="ticketDialogVisible = false"
+    />
+    <p-button
+      [label]="isSavingTicket() ? 'Guardando...' : 'Crear Ticket'"
+      [icon]="isSavingTicket() ? 'pi pi-spin pi-spinner' : 'pi pi-check'"
+      [disabled]="isSavingTicket()"
+      (onClick)="saveTicket()"
     />
   </ng-template>
 </p-dialog>

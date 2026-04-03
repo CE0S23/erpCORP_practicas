@@ -1,7 +1,7 @@
 <aside class="sidebar" [class.collapsed]="collapsed">
     <div class="sidebar-top">
         @if (!collapsed) {
-            <a [routerLink]="paths.home" class="brand-link"
+            <a [routerLink]="paths.dashboardAll" class="brand-link"
                 [title]="isInsideHome ? 'Volver al Home' : 'ERPPro'">
                 <span class="brand-name">
                     ERP<strong>Pro</strong>
@@ -25,7 +25,7 @@
             </div>
         }
         @if (!isInsideHome) {
-            <a [routerLink]="paths.home" routerLinkActive="active" class="nav-item" [title]="'Dashboard'">
+            <a [routerLink]="paths.dashboardAll" routerLinkActive="active" class="nav-item" [title]="'Dashboard'">
                 <i class="pi pi-home"></i>
                 @if (!collapsed) {
                     <span class="nav-label">Dashboard</span>
@@ -54,9 +54,11 @@
             </div>
             <div class="sidebar-perms">
                 @for (perm of currentUser()!.permissions; track perm) {
-                    <span class="sidebar-perm-chip" [title]="permissionLabels[perm]">
-                        <i [class]="permissionIcons[perm]"></i>
-                    </span>
+                    @if (permissionLabels[perm]) {
+                        <span class="sidebar-perm-chip" [title]="permissionLabels[perm]">
+                            <i [class]="permissionIcons[perm]"></i>
+                        </span>
+                    }
                 }
             </div>
         </div>

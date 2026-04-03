@@ -11,11 +11,11 @@
           styleClass="identity-avatar"
         />
         <div class="identity-info">
-          <h2 class="identity-name">{{ user?.name ?? 'Sin sesion' }}</h2>
-          <span class="identity-username">{{ '@' + (user?.username ?? '---') }}</span>
+          <h2 class="identity-name">{{ user()?.name ?? 'Sin sesion' }}</h2>
+          <span class="identity-username">{{ user()?.name ? ('@' + user()!.name) : '---' }}</span>
           <div class="identity-role-tag">
             <p-tag [value]="roleLabel()" [severity]="roleSeverity()" />
-            @if (!user?.enabled) {
+            @if (!user()?.enabled) {
               <p-tag value="Cuenta deshabilitada" severity="danger" />
             }
           </div>
@@ -27,7 +27,7 @@
       <div class="identity-meta">
         <div class="meta-row">
           <i class="pi pi-envelope meta-icon"></i>
-          <span>{{ user?.email ?? '---' }}</span>
+          <span>{{ user()?.email ?? '---' }}</span>
         </div>
         @if (userGroup()) {
           <div class="meta-row">
@@ -49,7 +49,7 @@
         }
         <div class="meta-row">
           <i class="pi pi-id-card meta-icon"></i>
-          <span class="u-muted" style="font-size:0.8rem">ID: {{ user?.id ?? '---' }}</span>
+          <span class="u-muted" style="font-size:0.8rem">ID: {{ user()?.id ?? '---' }}</span>
         </div>
       </div>
     </p-card>

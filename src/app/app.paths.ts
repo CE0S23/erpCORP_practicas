@@ -4,6 +4,7 @@ export const APP_PATHS = {
     register: '/register',
     home: '/home',
     dashboard: '/home',
+    dashboardAll: '/home/dashboard-all',
     group: '/home/group',
     tickets: '/home/tickets',
     usuarios: '/home/usuarios',

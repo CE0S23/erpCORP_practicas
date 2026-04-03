@@ -1,4 +1,6 @@
 import { Routes } from '@angular/router';
+import { permissionGuard } from './guards/permission.guard';
+import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
     {
@@ -18,13 +20,14 @@ export const routes: Routes = [
     },
     {
         path: 'home',
+        canActivate: [authGuard],
         loadComponent: () =>
             import('./layouts/main-layout/main-layout').then((m) => m.MainLayout),
         children: [
             {
                 path: '',
-                redirectTo: 'group',
-                pathMatch: 'full'
+                redirectTo: 'dashboard-all',
+                pathMatch: 'full',
             },
             {
                 path: 'dashboard-all',
@@ -33,16 +36,22 @@ export const routes: Routes = [
             },
             {
                 path: 'group',
+                canActivate: [permissionGuard],
+                data: { requiredPermission: 'view_groups' },
                 loadComponent: () =>
                     import('./group/group').then((m) => m.GroupPage),
             },
             {
                 path: 'tickets',
+                canActivate: [permissionGuard],
+                data: { requiredPermission: 'view_tickets' },
                 loadComponent: () =>
                     import('./pages/tickets/tickets').then((m) => m.TicketsPage),
             },
             {
                 path: 'usuarios',
+                canActivate: [permissionGuard],
+                data: { requiredRoles: ['admin', 'superAdmin'] },
                 loadComponent: () =>
                     import('./components/usuarios/usuarios').then((m) => m.UsuariosPage),
             },

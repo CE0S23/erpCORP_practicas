@@ -1,0 +1,57 @@
+services:
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "3000:3000"
+    env_file: ./api-gateway/.env
+    environment:
+      REDIS_URL: redis://redis:6379
+      USER_SERVICE_URL: http://user-service:3001
+      GROUPS_SERVICE_URL: http://groups-service:3002
+      TICKETS_SERVICE_URL: http://tickets-service:3003
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  user-service:
+    build: ./user-service
+    ports:
+      - "3001:3001"
+    env_file: ./user-service/.env
+    restart: unless-stopped
+
+  groups-service:
+    build: ./groups-service
+    ports:
+      - "3002:3002"
+    env_file: ./groups-service/.env
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+
+  tickets-service:
+    build: ./tickets-service
+    ports:
+      - "3003:3003"
+    env_file: ./tickets-service/.env
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+
+volumes:
+  redis_data:

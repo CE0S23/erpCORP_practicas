@@ -1,0 +1,5 @@
+export declare class UpdateUserDto {
+    name?: string;
+    avatarUrl?: string;
+    isActive?: boolean;
+}
