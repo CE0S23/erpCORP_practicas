@@ -25,6 +25,13 @@ export interface UserPayload {
   permissions: string[];
 }
 
+interface RequestUserContext {
+  id?: string;
+  email?: string;
+  role?: string;
+  permissions?: string[];
+}
+
 // ─── Full Prisma include fragment (shared by queries) ─────────────────────────
 
 const WITH_ROLE_AND_PERMISSIONS = {
@@ -39,6 +46,11 @@ const WITH_ROLE_AND_PERMISSIONS = {
       },
     },
   },
+  userPermissions: {
+    include: {
+      permission: true,
+    },
+  },
 } as const;
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -46,6 +58,7 @@ const WITH_ROLE_AND_PERMISSIONS = {
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
+  private static readonly MASTER_EMAIL = 'super@erp.com';
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -53,15 +66,55 @@ export class UsersService {
 
   /** Strips password_hash and flattens role/permissions for API responses. */
   private toResponse(user: any) {
-    const { passwordHash, userRoles, ...base } = user;
+    const { passwordHash, userRoles, userPermissions, ...base } = user;
 
     const firstRole = userRoles?.[0];
     const role        = firstRole?.role?.name ?? null;
-    const permissions: string[] = (userRoles ?? []).flatMap((ur: any) =>
+    const permissions = this.extractPermissions({ userRoles, userPermissions });
+
+    return { ...base, role, permissions };
+  }
+
+  private extractPermissions(user: { userRoles?: any[]; userPermissions?: any[] }) {
+    const customPermissions: string[] = (user.userPermissions ?? []).map((up: any) => up.permission.key);
+    if (customPermissions.length > 0) {
+      return [...new Set(customPermissions)];
+    }
+
+    const rolePermissions: string[] = (user.userRoles ?? []).flatMap((ur: any) =>
       (ur.role?.rolePermissions ?? []).map((rp: any) => rp.permission.key),
     );
 
-    return { ...base, role, permissions };
+    return [...new Set(rolePermissions)];
+  }
+
+  private isMasterUser(user: { email?: string | null; role?: string | null; permissions?: string[] } | null | undefined): boolean {
+    const email = user?.email?.toLowerCase?.() ?? '';
+    return email === UsersService.MASTER_EMAIL || user?.role === AppRole.superAdmin;
+  }
+
+  private parseRequestUser(xUser: string | undefined): RequestUserContext {
+    if (!xUser) throw new ForbiddenException('X-User header is missing');
+    try {
+      return JSON.parse(xUser);
+    } catch {
+      throw new ForbiddenException('X-User header is malformed');
+    }
+  }
+
+  private assertPermission(user: RequestUserContext, permission: string) {
+    if (this.isMasterUser(user)) return;
+    const permissions = Array.isArray(user.permissions) ? user.permissions : [];
+    const aliases: Record<string, string[]> = {
+      view_users: ['view_users', 'manage_users'],
+      create_users: ['create_users', 'manage_users'],
+      edit_user: ['edit_user', 'manage_users'],
+      delete_users: ['delete_users', 'manage_users'],
+    };
+    const accepted = aliases[permission] ?? [permission];
+    if (!permissions.some((perm) => accepted.includes(perm))) {
+      throw new ForbiddenException(`Missing permission: ${permission}`);
+    }
   }
 
   /** Returns the default 'user' Role record, throwing if seed data is missing. */
@@ -101,9 +154,7 @@ export class UsersService {
     }
 
     const role = user.userRoles[0]?.role?.name ?? 'user';
-    const permissions: string[] = user.userRoles.flatMap((ur) =>
-      ur.role.rolePermissions.map((rp) => rp.permission.key),
-    );
+    const permissions = this.extractPermissions(user);
 
     return { id: user.id, email: user.email, name: user.name, role, permissions };
   }
@@ -151,7 +202,10 @@ export class UsersService {
    *  - Assigns the 'user' role by default, or the role provided in the DTO.
    *  - Throws 409 if the email is already taken.
    */
-  async create(dto: CreateUserDto) {
+  async create(dto: CreateUserDto, xUser: string) {
+    const actor = this.parseRequestUser(xUser);
+    this.assertPermission(actor, 'create_users');
+
     // Guard: unique email
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
@@ -191,17 +245,59 @@ export class UsersService {
    * Updates a user's mutable fields: name, avatarUrl, isActive.
    * 404 if user does not exist.
    */
-  async update(id: string, dto: UpdateUserDto) {
-    await this.findOne(id); // throws 404 if missing
+  async update(id: string, dto: UpdateUserDto, xUser: string) {
+    const actor = this.parseRequestUser(xUser);
+    this.assertPermission(actor, 'edit_user');
 
-    const user = await this.prisma.user.update({
+    const existing = await this.prisma.user.findUnique({
       where: { id },
-      data: {
-        ...(dto.name      !== undefined && { name:      dto.name }),
-        ...(dto.avatarUrl !== undefined && { avatarUrl: dto.avatarUrl }),
-        ...(dto.isActive  !== undefined && { isActive:  dto.isActive }),
-      },
       include: WITH_ROLE_AND_PERMISSIONS,
+    });
+    if (!existing) throw new NotFoundException(`User with id "${id}" not found`);
+
+    const target = this.toResponse(existing);
+    if (!this.isMasterUser(actor)) {
+      if (target.email?.toLowerCase?.() === UsersService.MASTER_EMAIL || target.role === AppRole.superAdmin) {
+        throw new ForbiddenException('Cannot modify super administrator accounts');
+      }
+    }
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      if (dto.permissions !== undefined) {
+        await tx.userPermission.deleteMany({ where: { userId: id } });
+
+        const keys = [...new Set(dto.permissions)];
+        if (keys.length > 0) {
+          const permissions = await tx.permission.findMany({
+            where: { key: { in: keys } },
+            select: { id: true, key: true },
+          });
+
+          if (permissions.length !== keys.length) {
+            const found = new Set(permissions.map((perm) => perm.key));
+            const missing = keys.filter((key) => !found.has(key));
+            throw new BadRequestException(`Unknown permission(s): ${missing.join(', ')}`);
+          }
+
+          await tx.userPermission.createMany({
+            data: permissions.map((permission) => ({
+              userId: id,
+              permissionId: permission.id,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
+
+      return tx.user.update({
+        where: { id },
+        data: {
+          ...(dto.name      !== undefined && { name:      dto.name }),
+          ...(dto.avatarUrl !== undefined && { avatarUrl: dto.avatarUrl }),
+          ...(dto.isActive  !== undefined && { isActive:  dto.isActive }),
+        },
+        include: WITH_ROLE_AND_PERMISSIONS,
+      });
     });
 
     this.logger.log(`User updated: ${user.id}`);
@@ -213,8 +309,25 @@ export class UsersService {
    * Soft-deletes a user by setting isActive = false.
    * 404 if user does not exist.
    */
-  async remove(id: string) {
-    await this.findOne(id); // throws 404 if missing
+  async remove(id: string, xUser: string) {
+    const actor = this.parseRequestUser(xUser);
+    this.assertPermission(actor, 'delete_users');
+
+    const existing = await this.prisma.user.findUnique({
+      where: { id },
+      include: WITH_ROLE_AND_PERMISSIONS,
+    });
+    if (!existing) throw new NotFoundException(`User with id "${id}" not found`);
+
+    const target = this.toResponse(existing);
+    if (!this.isMasterUser(actor)) {
+      if (target.email?.toLowerCase?.() === UsersService.MASTER_EMAIL || target.role === AppRole.superAdmin) {
+        throw new ForbiddenException('Cannot remove super administrator accounts');
+      }
+      if (actor.id && actor.id === id) {
+        throw new ForbiddenException('You cannot disable your own account');
+      }
+    }
 
     const user = await this.prisma.user.update({
       where: { id },
@@ -239,19 +352,21 @@ export class UsersService {
    * Guards: only admin or superAdmin roles may list all users.
    * Called by the controller before findAll().
    */
-  assertAdminRole(xUser: string | undefined) {
+  assertCanViewUsers(xUser: string | undefined) {
     if (!xUser) throw new ForbiddenException('X-User header is missing');
 
-    let user: { role?: string };
+    let user: { role?: string; email?: string; permissions?: string[] };
     try {
       user = JSON.parse(xUser);
     } catch {
       throw new ForbiddenException('X-User header is malformed');
     }
 
-    const allowed: string[] = [AppRole.admin, AppRole.superAdmin];
-    if (!allowed.includes(user?.role ?? '')) {
-      throw new ForbiddenException('Only admin or superAdmin users can list all users');
+    if (this.isMasterUser(user)) return;
+
+    const permissions = Array.isArray(user?.permissions) ? user.permissions : [];
+    if (!permissions.includes('view_users') && !permissions.includes('manage_users')) {
+      throw new ForbiddenException('Missing permission: view_users');
     }
   }
 }

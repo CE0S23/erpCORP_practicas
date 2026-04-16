@@ -1,6 +1,6 @@
 // ── Tipos para UI (valores mostrados al usuario) ───────────────────────────────
 export type TicketStatus   = 'Pendiente' | 'En progreso' | 'Revisión' | 'Finalizado';
-export type TicketPriority = '极低' | '低' | '常规' | '中' | '高' | '紧急' | '严重';
+export type TicketPriority = 'Baja' | 'Media' | 'Alta' | 'Crítica';
 
 // ── Tipos del backend (fuente de verdad API) ───────────────────────────────────
 export type ApiTicketStatus   = 'open' | 'in_progress' | 'resolved' | 'closed' | 'cancelled';
@@ -25,16 +25,18 @@ export const STATUS_TO_API: Record<TicketStatus, ApiTicketStatus> = {
 
 /** Mapeo: prioridad backend → prioridad UI */
 export const PRIORITY_FROM_API: Record<ApiTicketPriority, TicketPriority> = {
-    low:      '低',
-    medium:   '中',
-    high:     '高',
-    critical: '严重',
+    low:      'Baja',
+    medium:   'Media',
+    high:     'Alta',
+    critical: 'Crítica',
 };
 
 /** Mapeo: prioridad UI → prioridad backend */
-export const PRIORITY_TO_API: Record<string, ApiTicketPriority> = {
-    '极低': 'low', '低': 'low', '常规': 'medium',
-    '中':  'medium', '高': 'high', '紧急': 'high', '严重': 'critical',
+export const PRIORITY_TO_API: Record<TicketPriority, ApiTicketPriority> = {
+    'Baja':    'low',
+    'Media':   'medium',
+    'Alta':    'high',
+    'Crítica': 'critical',
 };
 
 export interface TicketComment {

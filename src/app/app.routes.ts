@@ -51,7 +51,7 @@ export const routes: Routes = [
             {
                 path: 'usuarios',
                 canActivate: [permissionGuard],
-                data: { requiredRoles: ['admin', 'superAdmin'] },
+                data: { requiredPermission: 'view_users' },
                 loadComponent: () =>
                     import('./components/usuarios/usuarios').then((m) => m.UsuariosPage),
             },

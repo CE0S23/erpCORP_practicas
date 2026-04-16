@@ -1,7 +1,7 @@
 // groups-service/src/routes/members.js
 // ─── Group members routes ─────────────────────────────────────────────────────
 
-import { isAdminOrAbove, isOwnerOrAdmin } from './groups.js';
+import { isOwnerOrAdmin } from './groups.js';
 
 // ── JSON Schemas ───────────────────────────────────────────────────────────────
 
@@ -82,25 +82,10 @@ export default async function memberRoutes(fastify) {
   }, async (request, reply) => {
     const { id }         = request.params;
     const { page, limit } = request.query;
-    const user            = request.user;
     const offset          = (page - 1) * limit;
 
     const group = await requireGroup(id, reply);
     if (!group) return;
-
-    // Non-admins must be members themselves
-    if (!isAdminOrAbove(user)) {
-      const self = await prisma.groupMember.findFirst({
-        where: { group_id: id, user_id: user.id },
-      });
-      if (!self) {
-        return reply.code(403).send({
-          statusCode: 403,
-          error:      'Forbidden',
-          message:    'You are not a member of this group.',
-        });
-      }
-    }
 
     const [data, total] = await Promise.all([
       prisma.groupMember.findMany({
@@ -135,7 +120,7 @@ export default async function memberRoutes(fastify) {
       return reply.code(403).send({
         statusCode: 403,
         error:      'Forbidden',
-        message:    'Only the group owner or an admin can add members.',
+        message:    'Missing permission: edit_groups',
       });
     }
 
@@ -177,7 +162,7 @@ export default async function memberRoutes(fastify) {
       return reply.code(403).send({
         statusCode: 403,
         error:      'Forbidden',
-        message:    'Only the group owner or an admin can remove members.',
+        message:    'Missing permission: delete_groups',
       });
     }
 
@@ -230,7 +215,7 @@ export default async function memberRoutes(fastify) {
       return reply.code(403).send({
         statusCode: 403,
         error:      'Forbidden',
-        message:    'Only the group owner or an admin can change member roles.',
+        message:    'Missing permission: edit_groups',
       });
     }
 

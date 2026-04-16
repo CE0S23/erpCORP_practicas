@@ -73,7 +73,7 @@ export class UsersController {
    * GET /users?page=1&limit=10
    *
    * Paginated list of all users.
-   * Restricted to admin and superAdmin roles (validated from X-User header).
+   * Restricted by the granular `view_users` permission (or master bypass).
    */
   @Get()
   async findAll(
@@ -81,7 +81,7 @@ export class UsersController {
     @Query('page',  new ParseIntPipe({ optional: true })) page  = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit = 10,
   ) {
-    this.usersService.assertAdminRole(xUser);
+    this.usersService.assertCanViewUsers(xUser);
     return this.usersService.findAll(page, limit);
   }
 
@@ -106,8 +106,8 @@ export class UsersController {
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
+  create(@Headers('x-user') xUser: string, @Body() dto: CreateUserDto) {
+    return this.usersService.create(dto, xUser);
   }
 
   /**
@@ -118,8 +118,8 @@ export class UsersController {
    * 404 if the user does not exist.
    */
   @Put(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(id, dto);
+  update(@Headers('x-user') xUser: string, @Param('id') id: string, @Body() dto: UpdateUserDto) {
+    return this.usersService.update(id, dto, xUser);
   }
 
   /**
@@ -129,7 +129,7 @@ export class UsersController {
    * 404 if the user does not exist.
    */
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  remove(@Headers('x-user') xUser: string, @Param('id') id: string) {
+    return this.usersService.remove(id, xUser);
   }
 }

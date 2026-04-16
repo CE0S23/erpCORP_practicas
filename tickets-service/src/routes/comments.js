@@ -1,8 +1,20 @@
 // tickets-service/src/routes/comments.js
 // ─── Comment routes ───────────────────────────────────────────────────────────
 
-const isAdmin = (user) =>
-  user.role === 'admin' || user.role === 'superAdmin';
+const isMasterUser = (user) =>
+  (user?.email?.toLowerCase?.() ?? '') === 'super@erp.com' || user?.role === 'superAdmin';
+
+const hasPerm = (user, perm) => {
+  if (!Array.isArray(user.permissions)) return false;
+  const aliases = {
+    view_tickets: ['view_tickets', 'manage_tickets'],
+    create_tickets: ['create_tickets', 'manage_tickets'],
+    edit_tickets: ['edit_tickets', 'manage_tickets'],
+    delete_tickets: ['delete_tickets', 'manage_tickets'],
+  };
+  const accepted = aliases[perm] ?? [perm];
+  return user.permissions.some((p) => accepted.includes(p));
+};
 
 // ── JSON Schemas ──────────────────────────────────────────────────────────────
 
@@ -63,7 +75,8 @@ export default async function commentRoutes(fastify) {
       return null;
     }
 
-    if (!isAdmin(user) && ticket.creator_id !== user.id) {
+    const isInvolved = ticket.creator_id === user.id || ticket.assignee_id === user.id;
+    if (!isMasterUser(user) && !isInvolved && !hasPerm(user, 'view_tickets')) {
       reply.code(403).send({
         statusCode: 403,
         error:      'Forbidden',
@@ -164,12 +177,11 @@ export default async function commentRoutes(fastify) {
       });
     }
 
-    // Only the author or admin can delete
-    if (!isAdmin(user) && comment.author_id !== user.id) {
+    if (!isMasterUser(user) && comment.author_id !== user.id && !hasPerm(user, 'delete_tickets')) {
       return reply.code(403).send({
         statusCode: 403,
         error:      'Forbidden',
-        message:    'Only the comment author or an admin can delete this comment.',
+        message:    'Missing permission: delete_tickets',
       });
     }
 

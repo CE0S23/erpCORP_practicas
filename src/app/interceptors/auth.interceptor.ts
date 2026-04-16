@@ -19,7 +19,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         localStorage.removeItem(TOKEN_KEY);
         router.navigate(['/login']);
       }
-      // 403 → propagar sin redirigir
+
       return throwError(() => error);
     })
   );

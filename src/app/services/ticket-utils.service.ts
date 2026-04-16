@@ -16,28 +16,22 @@ export class TicketUtilsService {
 
   prioritySeverity(p: TicketPriority): 'secondary' | 'success' | 'warn' | 'danger' | 'info' {
     const map: Record<TicketPriority, 'secondary' | 'success' | 'warn' | 'danger' | 'info'> = {
-      '极低': 'secondary',
-      '低': 'info',
-      '常规': 'success',
-      '中': 'success',
-      '高': 'warn',
-      '紧急': 'danger',
-      '严重': 'danger',
+      'Baja':    'secondary',
+      'Media':   'success',
+      'Alta':    'warn',
+      'Crítica': 'danger',
     };
-    return map[p];
+    return map[p] ?? 'secondary';
   }
 
   priorityIcon(p: TicketPriority): string {
     const map: Record<TicketPriority, string> = {
-      '极低': 'pi pi-angle-double-down',
-      '低': 'pi pi-arrow-down',
-      '常规': 'pi pi-minus',
-      '中': 'pi pi-minus',
-      '高': 'pi pi-arrow-up',
-      '紧急': 'pi pi-angle-double-up',
-      '严重': 'pi pi-exclamation-triangle',
+      'Baja':    'pi pi-arrow-down',
+      'Media':   'pi pi-minus',
+      'Alta':    'pi pi-arrow-up',
+      'Crítica': 'pi pi-exclamation-triangle',
     };
-    return map[p];
+    return map[p] ?? 'pi pi-minus';
   }
 
   levelSeverity(nivel: GroupLevel): 'success' | 'info' | 'warn' | 'danger' {

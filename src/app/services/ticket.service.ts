@@ -21,13 +21,15 @@ export interface TicketFilters {
 export class TicketService {
     private readonly http   = inject(HttpClient);
     private readonly apiUrl = environment.apiUrl;
+    private static readonly UUID_REGEX =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     // ── Estado reactivo local ──────────────────────────────────────────────────
     private readonly _tickets = signal<Ticket[]>([]);
     readonly tickets = this._tickets.asReadonly();
 
     readonly statuses:   TicketStatus[]   = ['Pendiente', 'En progreso', 'Revisión', 'Finalizado'];
-    readonly priorities: TicketPriority[] = ['极低', '低', '常规', '中', '高', '紧急', '严重'];
+    readonly priorities: TicketPriority[] = ['Baja', 'Media', 'Alta', 'Crítica'];
 
     readonly statsCount = computed(() => ({
         total:      this._tickets().length,
@@ -173,7 +175,7 @@ export class TicketService {
             titulo:       dto.title       ?? dto.titulo       ?? '',
             descripcion:  dto.description ?? dto.descripcion  ?? '',
             status:       STATUS_FROM_API[dto.status as ApiTicketStatus] ?? 'Pendiente',
-            priority:     PRIORITY_FROM_API[dto.priority as ApiTicketPriority] ?? '中',
+            priority:     PRIORITY_FROM_API[dto.priority as ApiTicketPriority] ?? 'Media',
             assignedTo:   dto.assignee_id ?? dto.assignedTo   ?? '',
             assignedName: dto.assignee?.name ?? dto.assignedName ?? '',
             groupId:      dto.group_id    ?? dto.groupId      ?? '',
@@ -190,13 +192,47 @@ export class TicketService {
 
     private _mapToApi(ticket: Partial<Ticket>): Record<string, unknown> {
         const out: Record<string, unknown> = {};
-        if (ticket.titulo      !== undefined) out['title']       = ticket.titulo;
+        const coerceId = (value: unknown): string | null => {
+            if (typeof value === 'string') {
+                const trimmed = value.trim();
+                return TicketService.UUID_REGEX.test(trimmed) ? trimmed : null;
+            }
+            if (value && typeof value === 'object') {
+                const candidate = (value as { value?: unknown; id?: unknown }).value
+                    ?? (value as { value?: unknown; id?: unknown }).id;
+                if (typeof candidate === 'string') {
+                    const trimmed = candidate.trim();
+                    return TicketService.UUID_REGEX.test(trimmed) ? trimmed : null;
+                }
+            }
+            return null;
+        };
+        const normalizeDate = (value: unknown): string | null => {
+            if (value == null) return null;
+            const parsed = value instanceof Date ? value : new Date(String(value));
+            return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+        };
+
+        if (ticket.titulo !== undefined) {
+            out['title'] = String(ticket.titulo).trim();
+        }
         if (ticket.descripcion !== undefined) out['description'] = ticket.descripcion;
-        if (ticket.status      !== undefined) out['status']      = STATUS_TO_API[ticket.status];
+        if (ticket.status !== undefined) {
+            out['status'] = STATUS_TO_API[ticket.status as TicketStatus] ?? 'open';
+        }
         if (ticket.priority    !== undefined) out['priority']    = PRIORITY_TO_API[ticket.priority] ?? 'medium';
-        if (ticket.assignedTo  !== undefined) out['assignee_id'] = ticket.assignedTo || null;
-        if (ticket.groupId     !== undefined) out['group_id']    = ticket.groupId    || null;
-        if (ticket.dueDate     !== undefined) out['due_date']    = ticket.dueDate?.toISOString();
+        if (ticket.assignedTo  !== undefined) {
+            const assigneeId = coerceId(ticket.assignedTo);
+            if (assigneeId) out['assignee_id'] = assigneeId;
+        }
+        if (ticket.groupId     !== undefined) {
+            const groupId = coerceId(ticket.groupId);
+            if (groupId) out['group_id'] = groupId;
+        }
+        if (ticket.dueDate     !== undefined) {
+            const dueDate = normalizeDate(ticket.dueDate);
+            if (dueDate) out['due_date'] = dueDate;
+        }
         return out;
     }
 

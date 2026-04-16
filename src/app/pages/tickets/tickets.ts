@@ -5,7 +5,7 @@ import { ConfirmationService, MessageService } from 'primeng/api';
 import { TicketService } from '../../services/ticket.service';
 import { TicketUtilsService } from '../../services/ticket-utils.service';
 import { GroupService } from '../../services/group.service';
-import { AuthService } from '../../services/auth.service';
+import { AuthService, SYSTEM_USERS } from '../../services/auth.service';
 import { ErrorHandlerService } from '../../services/error-handler.service';
 import { PermissionService } from '../../services/permission.service';
 import { HasPermissionDirective } from '../../directives/has-permission.directive';
@@ -29,6 +29,9 @@ import { PRIMENG_MODULES } from '../../primeng';
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TicketsPage implements OnInit {
+    private static readonly UUID_REGEX =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     private readonly ticketService = inject(TicketService);
     private readonly groupService  = inject(GroupService);
     private readonly authService   = inject(AuthService);
@@ -55,7 +58,7 @@ export class TicketsPage implements OnInit {
             case 'mine':       return all.filter(t => t.assignedTo === userId);
             case 'unassigned': return all.filter(t => !t.assignedTo);
             case 'high':       return all.filter(t =>
-                t.priority === '高' || t.priority === '紧急' || t.priority === '严重');
+                t.priority === 'Alta' || t.priority === 'Crítica');
             default:           return all;
         }
     });
@@ -75,7 +78,8 @@ export class TicketsPage implements OnInit {
     editingId: string | null = null;
     submitted = false;
     draft = this.emptyDraft();
-    availableMembers: GroupMember[] = [];
+    /** Lista de miembros del grupo seleccionado — signal para que memberOptions sea reactivo */
+    readonly availableMembers = signal<GroupMember[]>([]);
 
     readonly statusOptions   = this.ticketService.statuses.map(s => ({ label: s, value: s }));
     readonly priorityOptions = this.ticketService.priorities.map(p => ({ label: p, value: p }));
@@ -83,17 +87,38 @@ export class TicketsPage implements OnInit {
     readonly groupOptions = computed(() =>
         this.groups().map(g => ({ label: g.nombre, value: g.id }))
     );
-    readonly memberOptions = computed(() =>
-        this.availableMembers.map(m => ({ label: m.name, value: m.id }))
-    );
+    readonly memberOptions = computed(() => {
+        const members  = this.availableMembers();
+        const sysUsers = SYSTEM_USERS();
+        return members.map(m => {
+            // Enriquecer con datos de SYSTEM_USERS cuando estén disponibles (admin)
+            const sys   = sysUsers.find(u => u.id === m.id);
+            const label = sys?.name || m.name || m.email || m.id;
+            return { label, value: m.id };
+        });
+    });
 
     private emptyDraft(): Omit<Ticket, 'id' | 'history' | 'comments'> {
         return {
-            titulo: '', descripcion: '', status: 'Pendiente', priority: '中',
+            titulo: '', descripcion: '', status: 'Pendiente', priority: 'Media',
             assignedTo: '', assignedName: '', groupId: '', groupName: '',
             createdAt: new Date(),
             dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         };
+    }
+
+    private normalizeSelectValue(value: unknown): string {
+        if (typeof value === 'string') return value.trim();
+        if (value && typeof value === 'object') {
+            const candidate = (value as { value?: unknown; id?: unknown }).value
+                ?? (value as { value?: unknown; id?: unknown }).id;
+            return typeof candidate === 'string' ? candidate.trim() : '';
+        }
+        return '';
+    }
+
+    private isUuid(value: string): boolean {
+        return TicketsPage.UUID_REGEX.test(value);
     }
 
     statusSeverity(s: TicketStatus)   { return this.utils.statusSeverity(s);   }
@@ -108,15 +133,49 @@ export class TicketsPage implements OnInit {
     }
 
     onGroupChange(): void {
-        const group = this.groups().find(g => g.id === this.draft.groupId);
+        this.draft.groupId    = this.normalizeSelectValue(this.draft.groupId);
+        const group           = this.groups().find(g => g.id === this.draft.groupId);
         this.draft.groupName  = group?.nombre ?? '';
         this.draft.assignedTo = '';
         this.draft.assignedName = '';
-        this.availableMembers = group?.memberList ?? [];
+        this._loadGroupMembers(this.draft.groupId);
+    }
+
+    /** Carga miembros del grupo en availableMembers sin modificar asignación actual */
+    private _loadGroupMembers(groupId: string): void {
+        if (!groupId) {
+            this.availableMembers.set([]);
+            return;
+        }
+
+        const group        = this.groups().find(g => g.id === groupId);
+        const localMembers = group?.memberList ?? [];
+
+        // Usar memberList local si ya tiene nombres (evitar petición extra)
+        if (localMembers.length > 0 && localMembers.some(m => m.name)) {
+            this.availableMembers.set(localMembers);
+            return;
+        }
+
+        // Obtener miembros desde la API y enriquecer con SYSTEM_USERS
+        this.groupService.getMembers(groupId).subscribe({
+            next: members => {
+                const sysUsers = SYSTEM_USERS();
+                const enriched = members.map(m => {
+                    const sys = sysUsers.find(u => u.id === m.id);
+                    return sys ? { ...m, name: sys.name, email: sys.email, username: sys.username } : m;
+                });
+                this.availableMembers.set(enriched.length > 0 ? enriched : localMembers);
+            },
+            error: () => {
+                this.availableMembers.set(localMembers);
+            },
+        });
     }
 
     onMemberChange(): void {
-        const member = this.availableMembers.find(m => m.id === this.draft.assignedTo);
+        this.draft.assignedTo = this.normalizeSelectValue(this.draft.assignedTo);
+        const member = this.availableMembers().find(m => m.id === this.draft.assignedTo);
         this.draft.assignedName = member?.name ?? '';
     }
 
@@ -159,7 +218,7 @@ export class TicketsPage implements OnInit {
         this.draft           = this.emptyDraft();
         this.editingId       = null;
         this.submitted       = false;
-        this.availableMembers = [];
+        this.availableMembers.set([]);
         this.formVisible     = true;
     }
 
@@ -179,16 +238,18 @@ export class TicketsPage implements OnInit {
             groupId: ticket.groupId, groupName: ticket.groupName,
             createdAt: ticket.createdAt, dueDate: ticket.dueDate,
         };
-        this.editingId       = ticket.id;
-        this.submitted       = false;
-        const group          = this.groups().find(g => g.id === ticket.groupId);
-        this.availableMembers = group?.memberList ?? [];
-        this.detailVisible   = false;
-        this.formVisible     = true;
+        this.editingId     = ticket.id;
+        this.submitted     = false;
+        this.detailVisible = false;
+        this.formVisible   = true;
+        // Cargar miembros del grupo sin resetear la asignación actual
+        this._loadGroupMembers(ticket.groupId);
     }
 
     save(): void {
         this.submitted = true;
+        this.draft.groupId = this.normalizeSelectValue(this.draft.groupId);
+        this.draft.assignedTo = this.normalizeSelectValue(this.draft.assignedTo);
         if (!this.draft.titulo.trim()) {
             this.messageService.add({
                 severity: 'warn', summary: 'Campo requerido',
@@ -196,12 +257,16 @@ export class TicketsPage implements OnInit {
             });
             return;
         }
-        if (!this.draft.groupId) {
+        if (!this.draft.groupId || !this.isUuid(this.draft.groupId)) {
             this.messageService.add({
                 severity: 'warn', summary: 'Campo requerido',
-                detail: 'Selecciona un grupo.', life: 3000,
+                detail: 'Selecciona un grupo vÃ¡lido.', life: 3000,
             });
             return;
+        }
+        if (this.draft.assignedTo && !this.isUuid(this.draft.assignedTo)) {
+            this.draft.assignedTo = '';
+            this.draft.assignedName = '';
         }
         if (this.isSaving()) return;
 

@@ -10,7 +10,6 @@ interface NavItem {
     label: string;
     icon: string;
     route: string;
-    adminOnly?: boolean;
     requiredPermission?: AppPermission | null;
 }
 
@@ -45,19 +44,15 @@ export class Sidebar {
         { label: 'Dashboard', icon: 'pi pi-chart-bar', route: APP_PATHS.dashboardAll, requiredPermission: null },
         { label: 'Tickets',   icon: 'pi pi-ticket',    route: APP_PATHS.tickets,      requiredPermission: AppPermission.VIEW_TICKETS },
         { label: 'Grupos',    icon: 'pi pi-users',     route: APP_PATHS.group,        requiredPermission: AppPermission.VIEW_GROUPS },
-        { label: 'Usuarios',  icon: 'pi pi-user',      route: APP_PATHS.usuarios,     requiredPermission: null, adminOnly: true },
+        { label: 'Usuarios',  icon: 'pi pi-user',      route: APP_PATHS.usuarios,     requiredPermission: AppPermission.VIEW_USERS },
         { label: 'Mi Perfil', icon: 'pi pi-id-card',   route: APP_PATHS.perfil,       requiredPermission: null },
     ];
 
     readonly navItems = computed<NavItem[]>(() => {
-        const user    = this.authService.currentUser();
-        const isAdmin = this.permissions.isAdmin;
-
         return this.allNavItems.filter(item => {
-            if (item.adminOnly && !isAdmin) return false;
             if (item.requiredPermission === null) return true;
             if (item.requiredPermission) {
-                return user?.permissions?.includes(item.requiredPermission) ?? false;
+                return this.permissions.hasPermission(item.requiredPermission);
             }
             return true;
         });

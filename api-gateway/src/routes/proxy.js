@@ -18,33 +18,70 @@ const PERMISSION_MAP = {
   // Users
   'GET /api/users':    'view_users',
   'POST /api/users':   'create_users',
-  'PUT /api/users':    'edit_users',
+  'PUT /api/users':    'edit_user',
+  'PATCH /api/users':  'edit_user',
   'DELETE /api/users': 'delete_users',
 
   // Groups
   'GET /api/groups':    'view_groups',
   'POST /api/groups':   'create_groups',
   'PUT /api/groups':    'edit_groups',
+  'PATCH /api/groups':  'edit_groups',
   'DELETE /api/groups': 'delete_groups',
+
+  // Categories (managed via the groups service)
+  'GET /api/categories':    'view_groups',
+  'POST /api/categories':   'create_groups',
+  'DELETE /api/categories': 'delete_groups',
 
   // Tickets
   'GET /api/tickets':    'view_tickets',
   'POST /api/tickets':   'create_tickets',
-  'PUT /api/tickets':    'manage_tickets',
-  'PATCH /api/tickets':  'manage_tickets',
-  'DELETE /api/tickets': 'manage_tickets',
+  'PUT /api/tickets':    'edit_tickets',
+  'PATCH /api/tickets':  'edit_tickets',
+  'DELETE /api/tickets': 'delete_tickets',
+};
+
+const LEGACY_PERMISSION_ALIASES = {
+  view_tickets:   ['view_tickets', 'manage_tickets'],
+  create_tickets: ['create_tickets', 'manage_tickets'],
+  edit_tickets:   ['edit_tickets', 'manage_tickets'],
+  delete_tickets: ['delete_tickets', 'manage_tickets'],
+
+  view_groups:    ['view_groups', 'manage_groups'],
+  create_groups:  ['create_groups', 'manage_groups'],
+  edit_groups:    ['edit_groups', 'manage_groups'],
+  delete_groups:  ['delete_groups', 'manage_groups'],
+
+  view_users:     ['view_users', 'manage_users'],
+  create_users:   ['create_users', 'manage_users'],
+  edit_user:      ['edit_user', 'manage_users'],
+  delete_users:   ['delete_users', 'manage_users'],
 };
 
 // ─── Service routing ─────────────────────────────────────────────────────────
 
 const SERVICE_MAP = {
-  users:   () => process.env.USER_SERVICE_URL    || 'http://localhost:3001',
-  groups:  () => process.env.GROUPS_SERVICE_URL  || 'http://localhost:3002',
-  tickets: () => process.env.TICKETS_SERVICE_URL || 'http://localhost:3003',
+  users:      () => process.env.USER_SERVICE_URL    || 'http://localhost:3001',
+  groups:     () => process.env.GROUPS_SERVICE_URL  || 'http://localhost:3002',
+  categories: () => process.env.GROUPS_SERVICE_URL  || 'http://localhost:3002', // same service as groups
+  tickets:    () => process.env.TICKETS_SERVICE_URL || 'http://localhost:3003',
 };
+
+const MASTER_EMAIL = 'super@erp.com';
 
 function getServiceUrl(resource) {
   return SERVICE_MAP[resource]?.() ?? null;
+}
+
+function isMasterUser(user) {
+  const email = user?.email?.toLowerCase?.() ?? '';
+  return email === MASTER_EMAIL || user?.role === 'superAdmin';
+}
+
+function hasRequiredPermission(userPermissions, requiredPermission) {
+  const allowedKeys = LEGACY_PERMISSION_ALIASES[requiredPermission] ?? [requiredPermission];
+  return userPermissions.some((perm) => allowedKeys.includes(perm));
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -64,6 +101,30 @@ function parseProxyUrl(rawUrl) {
   const withoutPrefix = rawUrl.replace(/^\/api/, '') || '/';
   const resource = withoutPrefix.split('/').filter(Boolean)[0] ?? '';
   return { resource, targetPath: withoutPrefix };
+}
+
+async function fetchLiveUser(requestUser) {
+  if (!requestUser?.id) return requestUser;
+
+  const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+  const response = await fetch(`${userServiceUrl}/users/profile/me`, {
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      'x-user': JSON.stringify(requestUser),
+    },
+    signal: AbortSignal.timeout(8_000),
+  });
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(body?.message ?? 'Unable to refresh user permissions.');
+    error.statusCode = response.status;
+    throw error;
+  }
+
+  return body?.data ?? body;
 }
 
 // ─── Plugin ───────────────────────────────────────────────────────────────────
@@ -89,20 +150,38 @@ export default async function proxyRoutes(fastify) {
     const token = extractToken(request);
     if (!token) return; // Already rejected by JWT hook above
 
-    const blacklisted = await fastify.redis.get(`blacklist:${token}`);
-    if (blacklisted) {
-      return reply.code(401).send({
-        statusCode: 401,
-        intOpCode:  'SxGW401',
-        data:       null,
-        error:      'Unauthorized',
-        message:    'Token has been revoked. Please log in again.',
-      });
+    try {
+      const blacklisted = await fastify.redis.get(`blacklist:${token}`);
+      if (blacklisted) {
+        return reply.code(401).send({
+          statusCode: 401,
+          intOpCode:  'SxGW401',
+          data:       null,
+          error:      'Unauthorized',
+          message:    'Token has been revoked. Please log in again.',
+        });
+      }
+    } catch {
+      // Redis unavailable — skip blacklist check in dev
+      fastify.log.warn('[proxy] Redis unavailable, skipping blacklist check');
     }
   });
 
   // ── Hook 3: Permission check ──────────────────────────────────────────────
   fastify.addHook('preHandler', async (request, reply) => {
+    try {
+      request.user = await fetchLiveUser(request.user);
+    } catch (err) {
+      fastify.log.error({ err: err.message, userId: request.user?.id }, '[proxy] failed to refresh user');
+      return reply.code(503).send({
+        statusCode: 503,
+        intOpCode:  'SxGW503',
+        data:       null,
+        error:      'Service Unavailable',
+        message:    'Unable to validate your latest permissions right now. Please try again shortly.',
+      });
+    }
+
     const { resource } = parseProxyUrl(request.raw.url);
     const permKey = `${request.method} /api/${resource}`;
     const required = PERMISSION_MAP[permKey];
@@ -117,8 +196,10 @@ export default async function proxyRoutes(fastify) {
       });
     }
 
-    const userPermissions = request.user?.permissions ?? [];
-    if (!userPermissions.includes(required)) {
+    if (isMasterUser(request.user)) return;
+
+    const userPermissions = Array.isArray(request.user?.permissions) ? request.user.permissions : [];
+    if (!hasRequiredPermission(userPermissions, required)) {
       fastify.log.warn(
         { userId: request.user?.id, required, userPermissions },
         '[proxy] permission denied'

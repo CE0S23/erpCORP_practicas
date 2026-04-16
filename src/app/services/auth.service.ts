@@ -1,4 +1,5 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Injectable, signal, inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, of, firstValueFrom } from 'rxjs';
@@ -6,21 +7,35 @@ import { tap, switchMap, map, catchError } from 'rxjs/operators';
 import {
     ApiResponse, AuthState, HardcodedCredential,
     LoginRequest, RegisterRequest, User,
-    createUserWithDefaultPermissions,
 } from '../models/user.model';
 import { Permission, AppRole, ROLE_DEFAULT_PERMISSIONS } from '../models/role.model';
 import { environment } from '../../environments/environment';
 
 const TOKEN_KEY = 'erp_token';
+const PERMISSION_ALIASES: Record<string, string[]> = {
+    view_tickets: ['view_tickets', 'manage_tickets'],
+    create_tickets: ['create_tickets', 'manage_tickets'],
+    edit_tickets: ['edit_tickets', 'manage_tickets'],
+    delete_tickets: ['delete_tickets', 'manage_tickets'],
+    view_groups: ['view_groups', 'manage_groups'],
+    create_groups: ['create_groups', 'manage_groups'],
+    edit_groups: ['edit_groups', 'manage_groups'],
+    delete_groups: ['delete_groups', 'manage_groups'],
+    view_users: ['view_users', 'manage_users'],
+    create_users: ['create_users', 'manage_users'],
+    edit_user: ['edit_user', 'manage_users'],
+    delete_users: ['delete_users', 'manage_users'],
+};
 
 /** Catálogo reactivo de usuarios del sistema (compatibilidad con componentes existentes) */
 export const SYSTEM_USERS = signal<User[]>([]);
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-    private readonly http   = inject(HttpClient);
-    private readonly router = inject(Router);
-    private readonly apiUrl = environment.apiUrl;
+    private readonly http       = inject(HttpClient);
+    private readonly router     = inject(Router);
+    private readonly platformId = inject(PLATFORM_ID);
+    private readonly apiUrl     = environment.apiUrl;
 
     /** Signal con el usuario en sesión */
     readonly currentUser = signal<User | null>(null);
@@ -71,7 +86,11 @@ export class AuthService {
     // ── Register ───────────────────────────────────────────────────────────────
 
     register(data: RegisterRequest): Observable<ApiResponse<User>> {
-        return this.http.post<any>(`${this.apiUrl}/api/users`, data).pipe(
+        return this.http.post<any>(`${this.apiUrl}/api/users`, {
+            email: data.email,
+            name: data.name,
+            password: data.password,
+        }).pipe(
             map(dto => ({
                 success: true as const,
                 message: 'Usuario creado correctamente.',
@@ -109,12 +128,14 @@ export class AuthService {
     // ── Init (APP_INITIALIZER) ─────────────────────────────────────────────────
 
     async initAuth(): Promise<void> {
+        if (!isPlatformBrowser(this.platformId)) return;
         if (!localStorage.getItem(TOKEN_KEY)) return;
 
         try {
             await firstValueFrom(this.me());
-            // Carga lista de usuarios para funciones admin (falla en silencio)
-            this.loadUsers().subscribe();
+            if (this.hasPermission('view_users')) {
+                this.loadUsers().subscribe();
+            }
         } catch {
             localStorage.removeItem(TOKEN_KEY);
         }
@@ -123,8 +144,17 @@ export class AuthService {
     // ── Carga de usuarios (admin) ──────────────────────────────────────────────
 
     loadUsers(): Observable<User[]> {
-        return this.http.get<any[]>(`${this.apiUrl}/api/users`).pipe(
-            map(dtos => dtos.map(dto => this._mapDtoToUser(dto))),
+        if (!this.hasPermission('view_users')) {
+            return of([] as User[]);
+        }
+
+        return this.http.get<any>(`${this.apiUrl}/api/users`).pipe(
+            // The interceptor unwraps { statusCode, intOpCode, data } → data.
+            // The user-service paginates: data = { data: User[], total, page, ... }
+            map(res => {
+                const rows: any[] = Array.isArray(res) ? res : (res?.data ?? []);
+                return rows.map(dto => this._mapDtoToUser(dto));
+            }),
             tap(users => SYSTEM_USERS.set(users)),
             catchError(() => of([] as User[]))
         );
@@ -135,7 +165,8 @@ export class AuthService {
     hasPermission(permission: string): boolean {
         const user = this.currentUser();
         if (!user?.enabled) return false;
-        return user.permissions?.includes(permission as Permission) ?? false;
+        const accepted = PERMISSION_ALIASES[permission] ?? [permission];
+        return accepted.some(p => user.permissions?.includes(p as Permission));
     }
 
     hasRole(role: AppRole): boolean {
@@ -150,36 +181,60 @@ export class AuthService {
     // ── Gestión local de usuarios (compatibilidad con página Usuarios) ─────────
 
     updateUserPermissions(userId: string, permissions: Permission[]): void {
-        SYSTEM_USERS.update(list =>
-            list.map(u => u.id === userId ? { ...u, permissions } : u)
-        );
-        if (this.currentUser()?.id === userId) {
-            const updated = SYSTEM_USERS().find(u => u.id === userId);
-            if (updated) {
+        this.http.put<any>(`${this.apiUrl}/api/users/${userId}`, { permissions }).pipe(
+            map(dto => this._mapDtoToUser(dto)),
+            tap(updated => this._upsertSystemUser(updated)),
+            catchError(() => of(null))
+        ).subscribe(updated => {
+            if (updated && this.currentUser()?.id === userId) {
                 this.currentUser.set(updated);
                 this.authState.update(s => ({ ...s, user: updated }));
             }
-        }
+        });
     }
 
     toggleUserEnabled(userId: string): void {
-        SYSTEM_USERS.update(list =>
-            list.map(u => u.id === userId ? { ...u, enabled: !u.enabled } : u)
+        const target = SYSTEM_USERS().find(u => u.id === userId);
+        if (!target) return;
+
+        this.http.put<any>(`${this.apiUrl}/api/users/${userId}`, {
+            isActive: !target.enabled,
+        }).pipe(
+            map(dto => this._mapDtoToUser(dto)),
+            tap(updated => this._upsertSystemUser(updated)),
+            catchError(() => of(null))
+        ).subscribe(updated => {
+            if (updated && this.currentUser()?.id === userId) {
+                this.currentUser.set(updated);
+                this.authState.update(s => ({ ...s, user: updated }));
+            }
+        });
+    }
+
+    createUser(data: Omit<User, 'id' | 'permissions' | 'enabled'> & { password?: string }): Observable<ApiResponse<User>> {
+        return this.http.post<any>(`${this.apiUrl}/api/users`, {
+            email:    data.email,
+            name:     data.name,
+            password: data.password?.trim() || 'Temporal123*',
+            role:     data.role,
+        }).pipe(
+            map(dto => {
+                const newUser = this._mapDtoToUser(dto);
+                this._upsertSystemUser(newUser);
+                return { success: true as const, message: 'Usuario creado correctamente.', data: newUser };
+            }),
+            catchError(err => {
+                const message = err?.error?.message ?? 'No se pudo crear el usuario.';
+                return of({ success: false as const, message } as ApiResponse<User>);
+            })
         );
     }
 
-    createUser(data: Omit<User, 'id' | 'permissions' | 'enabled'>): Observable<ApiResponse<User>> {
-        const emailTaken = SYSTEM_USERS().some(u => u.email === data.email);
-        if (emailTaken) {
-            return of<ApiResponse<User>>({ success: false, message: 'Ya existe un usuario con ese correo.' });
-        }
-        const newUser = createUserWithDefaultPermissions({ id: `usr-${Date.now()}`, ...data });
-        SYSTEM_USERS.update(list => [...list, newUser]);
-        return of<ApiResponse<User>>({ success: true, message: 'Usuario creado correctamente.', data: newUser });
-    }
-
     deleteUser(userId: string): void {
-        SYSTEM_USERS.update(list => list.filter(u => u.id !== userId));
+        this.http.delete<void>(`${this.apiUrl}/api/users/${userId}`).pipe(
+            tap(() => SYSTEM_USERS.update(list => list.filter(u => u.id !== userId))),
+            catchError(() => of(void 0))
+        ).subscribe();
     }
 
     // ── Privados ───────────────────────────────────────────────────────────────
@@ -191,6 +246,13 @@ export class AuthService {
         this.router.navigate(['/login']);
     }
 
+    private _upsertSystemUser(user: User): void {
+        SYSTEM_USERS.update(list => {
+            const exists = list.some(u => u.id === user.id);
+            return exists ? list.map(u => u.id === user.id ? user : u) : [...list, user];
+        });
+    }
+
     private _mapDtoToUser(dto: any): User {
         const role = (dto.role ?? dto.roles?.[0]?.name ?? 'user') as AppRole;
         return {
@@ -199,7 +261,9 @@ export class AuthService {
             name:        dto.name,
             email:       dto.email,
             role,
-            permissions: dto.permissions ?? ROLE_DEFAULT_PERMISSIONS[role] ?? [],
+            permissions: (Array.isArray(dto.permissions) && dto.permissions.length > 0)
+                ? dto.permissions
+                : (ROLE_DEFAULT_PERMISSIONS[role] ?? []),
             enabled:     dto.isActive ?? dto.enabled ?? dto.is_active ?? true,
             avatarUrl:   dto.avatarUrl ?? dto.avatar_url,
         };

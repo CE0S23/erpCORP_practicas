@@ -47,16 +47,19 @@ export class GroupPage implements OnInit {
   readonly paths   = APP_PATHS;
 
   /** Nombres de categorías para el dropdown del formulario */
-  readonly categoryNames = computed(() =>
-    this.groupService.categories().map(c => c.name)
-  );
+  readonly categoryNames = computed(() => {
+    const fromApi = this.groupService.categories().map(c => c.name);
+    const fromGroups = this.groups()
+      .map(g => g.categoria)
+      .filter((name): name is string => !!name && name.trim().length > 0);
+    return [...new Set([...fromApi, ...fromGroups])].sort((a, b) => a.localeCompare(b));
+  });
 
+  // El backend ya filtra por membresía para roles no-admin,
+  // así que mostramos todos los grupos que devuelva la API.
   readonly visibleGroups = computed(() => {
-    const all  = this.groups();
-    const user = this.authService.authState().user;
-    if (!user) return [];
-    if (['superAdmin', 'admin', 'medium'].includes(user.role)) return all;
-    return all.filter(g => g.memberList.some(m => m.id === user.id));
+    if (!this.authService.authState().user) return [];
+    return this.groups();
   });
 
   readonly systemUsers = SYSTEM_USERS.asReadonly();
@@ -131,7 +134,7 @@ export class GroupPage implements OnInit {
       case 'mine':          return tickets.filter(t => t.assignedTo === me);
       case 'unassigned':    return tickets.filter(t => !t.assignedTo);
       case 'high-priority': return tickets.filter(t =>
-          t.priority === '高' || t.priority === '紧急' || t.priority === '严重');
+          t.priority === 'Alta' || t.priority === 'Crítica');
       default:              return tickets;
     }
   });
@@ -167,7 +170,6 @@ export class GroupPage implements OnInit {
 
   ngOnInit(): void {
     this.groupService.getGroups().subscribe();
-    this.groupService.getCategories().subscribe();
     this.ticketService.getTickets().subscribe();
   }
 
@@ -200,7 +202,7 @@ export class GroupPage implements OnInit {
 
   private emptyTicketDraft(): Omit<Ticket, 'id' | 'history' | 'comments'> {
     return {
-      titulo: '', descripcion: '', status: 'Pendiente', priority: '中',
+      titulo: '', descripcion: '', status: 'Pendiente', priority: 'Media',
       assignedTo: '', assignedName: '',
       groupId: '', groupName: '',
       createdAt: new Date(),

@@ -15,6 +15,9 @@ export const permissionGuard: CanActivateFn = (route) => {
   const router            = inject(Router);
   const messageService    = inject(MessageService);
 
+  // superAdmin bypasses every route guard
+  if (permissionService.isSuperAdmin) return true;
+
   // ── Validación por rol ─────────────────────────────────────────────────
   const requiredRoles = route.data?.['requiredRoles'] as AppRole[] | undefined;
   if (requiredRoles?.length) {

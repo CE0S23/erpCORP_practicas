@@ -47,7 +47,8 @@ export class UsuariosPage {
   ];
   readonly breadcrumbHome = { icon: 'pi pi-home', routerLink: this.paths.dashboard };
 
-  readonly usuarios    = computed(() => SYSTEM_USERS());
+  // super@erp.com is the immutable owner — hidden from the table so no one can touch its permissions
+  readonly usuarios    = computed(() => SYSTEM_USERS().filter(u => u.email !== 'super@erp.com'));
   readonly systemUsers = SYSTEM_USERS.asReadonly();
 
   readonly totalActive   = computed(() => this.usuarios().filter(u => u.enabled).length);
@@ -184,6 +185,15 @@ export class UsuariosPage {
       });
       return;
     }
+    if (!this.draft.password || this.draft.password.trim().length < 8) {
+      this.messageService.add({
+        severity: 'warn',
+        summary:  'Contraseña requerida',
+        detail:   'La contraseña debe tener al menos 8 caracteres.',
+        life: 3000,
+      });
+      return;
+    }
     if (this.isSaving()) return;
     this.isSaving.set(true);
 
@@ -192,6 +202,7 @@ export class UsuariosPage {
       name:     this.draft.name,
       email:    this.draft.email,
       role:     this.draft.role,
+      password: this.draft.password,
     }).subscribe(res => {
       if (res.success) {
         this.messageService.add({

@@ -4,8 +4,21 @@
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Returns true if the user has admin-level access */
-const isAdmin = (user) =>
-  user.role === 'admin' || user.role === 'superAdmin';
+const isMasterUser = (user) =>
+  (user?.email?.toLowerCase?.() ?? '') === 'super@erp.com' || user?.role === 'superAdmin';
+
+/** Returns true if the user has a specific permission key */
+const hasPerm = (user, perm) => {
+  if (!Array.isArray(user.permissions)) return false;
+  const aliases = {
+    view_tickets: ['view_tickets', 'manage_tickets'],
+    create_tickets: ['create_tickets', 'manage_tickets'],
+    edit_tickets: ['edit_tickets', 'manage_tickets'],
+    delete_tickets: ['delete_tickets', 'manage_tickets'],
+  };
+  const accepted = aliases[perm] ?? [perm];
+  return user.permissions.some((p) => accepted.includes(p));
+};
 
 /**
  * Record one history entry in ticket_history.
@@ -72,12 +85,30 @@ const createBodySchema = {
   required: ['title'],
   properties: {
     title:       { type: 'string', minLength: 1, maxLength: 255 },
-    description: { type: 'string' },
+    description: { type: ['string', 'null'] },
     status:      { type: 'string', enum: ticketStatusEnum },
     priority:    { type: 'string', enum: ticketPriorityEnum },
-    assignee_id: { type: 'string', format: 'uuid' },
-    group_id:    { type: 'string', format: 'uuid' },
-    due_date:    { type: 'string', format: 'date-time' },
+    assignee_id: {
+      anyOf: [
+        { type: 'string', format: 'uuid' },
+        { type: 'null' },
+        { type: 'string', maxLength: 0 },
+      ],
+    },
+    group_id: {
+      anyOf: [
+        { type: 'string', format: 'uuid' },
+        { type: 'null' },
+        { type: 'string', maxLength: 0 },
+      ],
+    },
+    due_date: {
+      anyOf: [
+        { type: 'string', format: 'date-time' },
+        { type: 'null' },
+        { type: 'string', maxLength: 0 },
+      ],
+    },
   },
   additionalProperties: false,
 };
@@ -89,9 +120,27 @@ const updateBodySchema = {
     description: { type: 'string' },
     status:      { type: 'string', enum: ticketStatusEnum },
     priority:    { type: 'string', enum: ticketPriorityEnum },
-    assignee_id: { type: ['string', 'null'], format: 'uuid' },
-    group_id:    { type: ['string', 'null'], format: 'uuid' },
-    due_date:    { type: ['string', 'null'], format: 'date-time' },
+    assignee_id: {
+      anyOf: [
+        { type: 'string', format: 'uuid' },
+        { type: 'null' },
+        { type: 'string', maxLength: 0 },
+      ],
+    },
+    group_id: {
+      anyOf: [
+        { type: 'string', format: 'uuid' },
+        { type: 'null' },
+        { type: 'string', maxLength: 0 },
+      ],
+    },
+    due_date: {
+      anyOf: [
+        { type: 'string', format: 'date-time' },
+        { type: 'null' },
+        { type: 'string', maxLength: 0 },
+      ],
+    },
   },
   additionalProperties: false,
   minProperties: 1,
@@ -134,9 +183,13 @@ export default async function ticketRoutes(fastify) {
     // Build dynamic where clause
     const where = {};
 
-    // Non-admins only see their own tickets
-    if (!isAdmin(user)) {
-      where.creator_id = user.id;
+    // If the gateway let the request through, `view_tickets` already applies.
+    // Keep only the master-user bypass here as a safety valve.
+    if (!isMasterUser(user) && !hasPerm(user, 'view_tickets')) {
+      where.OR = [
+        { creator_id:  user.id },
+        { assignee_id: user.id },
+      ];
     }
 
     if (status)      where.status      = status;
@@ -185,8 +238,9 @@ export default async function ticketRoutes(fastify) {
       });
     }
 
-    // Non-admin users can only see their own tickets
-    if (!isAdmin(user) && ticket.creator_id !== user.id) {
+    // Safety valve if a request somehow reaches the service without the expected permission.
+    const isInvolved = ticket.creator_id === user.id || ticket.assignee_id === user.id;
+    if (!isMasterUser(user) && !isInvolved && !hasPerm(user, 'view_tickets')) {
       return reply.code(403).send({
         statusCode: 403,
         error:      'Forbidden',
@@ -202,10 +256,23 @@ export default async function ticketRoutes(fastify) {
     schema: { body: createBodySchema },
   }, async (request, reply) => {
     const user = request.user;
+    const canCreate = isMasterUser(user) || hasPerm(user, 'create_tickets');
+    if (!canCreate) {
+      return reply.code(403).send({
+        statusCode: 403,
+        error:      'Forbidden',
+        message:    'Missing permission: create_tickets',
+      });
+    }
+
     const {
       title, description, status, priority,
       assignee_id, group_id, due_date,
     } = request.body;
+
+    const normalizedAssigneeId = assignee_id === '' ? null : assignee_id;
+    const normalizedGroupId    = group_id === '' ? null : group_id;
+    const normalizedDueDate    = due_date === '' ? null : due_date;
 
     const ticket = await prisma.ticket.create({
       data: {
@@ -214,9 +281,9 @@ export default async function ticketRoutes(fastify) {
         status:      status      ?? 'open',
         priority:    priority    ?? 'medium',
         creator_id:  user.id,
-        assignee_id: assignee_id ?? null,
-        group_id:    group_id    ?? null,
-        due_date:    due_date    ? new Date(due_date) : null,
+        assignee_id: normalizedAssigneeId ?? null,
+        group_id:    normalizedGroupId    ?? null,
+        due_date:    normalizedDueDate    ? new Date(normalizedDueDate) : null,
       },
     });
 
@@ -251,12 +318,12 @@ export default async function ticketRoutes(fastify) {
       });
     }
 
-    // Only creator or admin can modify
-    if (!isAdmin(user) && existing.creator_id !== user.id) {
+    const canEdit = isMasterUser(user) || hasPerm(user, 'edit_tickets');
+    if (!canEdit) {
       return reply.code(403).send({
         statusCode: 403,
         error:      'Forbidden',
-        message:    'Only the ticket creator or an admin can modify this ticket.',
+        message:    'Missing permission: edit_tickets',
       });
     }
 
@@ -268,9 +335,12 @@ export default async function ticketRoutes(fastify) {
     if ('description' in body) updates.description = body.description;
     if ('status'      in body) updates.status      = body.status;
     if ('priority'    in body) updates.priority    = body.priority;
-    if ('assignee_id' in body) updates.assignee_id = body.assignee_id;
-    if ('group_id'    in body) updates.group_id    = body.group_id;
-    if ('due_date'    in body) updates.due_date    = body.due_date ? new Date(body.due_date) : null;
+    if ('assignee_id' in body) updates.assignee_id = body.assignee_id === '' ? null : body.assignee_id;
+    if ('group_id'    in body) updates.group_id    = body.group_id === '' ? null : body.group_id;
+    if ('due_date'    in body) {
+      const normalizedDueDate = body.due_date === '' ? null : body.due_date;
+      updates.due_date = normalizedDueDate ? new Date(normalizedDueDate) : null;
+    }
 
     // Record field-level changes before applying the update
     await recordFieldChanges(prisma, { ticket: existing, updates, changed_by: user.id });
@@ -299,12 +369,12 @@ export default async function ticketRoutes(fastify) {
       });
     }
 
-    // Only creator or admin can cancel
-    if (!isAdmin(user) && existing.creator_id !== user.id) {
+    const canCancel = isMasterUser(user) || hasPerm(user, 'delete_tickets');
+    if (!canCancel) {
       return reply.code(403).send({
         statusCode: 403,
         error:      'Forbidden',
-        message:    'Only the ticket creator or an admin can cancel this ticket.',
+        message:    'Missing permission: delete_tickets',
       });
     }
 

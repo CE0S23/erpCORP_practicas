@@ -3,8 +3,13 @@
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
-export const isAdminOrAbove = (user) =>
-  user.role === 'admin' || user.role === 'superAdmin';
+const MASTER_EMAIL = 'super@erp.com';
+
+export const isMasterUser = (user) =>
+  (user?.email?.toLowerCase?.() ?? '') === MASTER_EMAIL || user?.role === 'superAdmin';
+
+export const hasPerm = (user, perm) =>
+  Array.isArray(user?.permissions) && user.permissions.includes(perm);
 
 /**
  * Returns true if the user is the 'owner' of the group OR is admin/superAdmin.
@@ -13,7 +18,7 @@ export const isAdminOrAbove = (user) =>
  * @param {import('@prisma/client').PrismaClient} prisma
  */
 export async function isOwnerOrAdmin(user, groupId, prisma) {
-  if (isAdminOrAbove(user)) return true;
+  if (isMasterUser(user) || hasPerm(user, 'edit_groups')) return true;
   const membership = await prisma.groupMember.findFirst({
     where: { group_id: groupId, user_id: user.id, role: 'owner' },
   });
@@ -107,11 +112,6 @@ export default async function groupRoutes(fastify) {
     if (level       !== undefined) where.level       = level;
     if (is_active   !== undefined) where.is_active   = is_active;
 
-    // Non-admins only see groups they belong to
-    if (!isAdminOrAbove(user)) {
-      where.members = { some: { user_id: user.id } };
-    }
-
     const [groups, total] = await Promise.all([
       prisma.group.findMany({
         where,
@@ -142,20 +142,6 @@ export default async function groupRoutes(fastify) {
     const { id } = request.params;
     const user   = request.user;
 
-    // Non-admins must be members to view a group
-    if (!isAdminOrAbove(user)) {
-      const membership = await prisma.groupMember.findFirst({
-        where: { group_id: id, user_id: user.id },
-      });
-      if (!membership) {
-        return reply.code(403).send({
-          statusCode: 403,
-          error:      'Forbidden',
-          message:    'You are not a member of this group.',
-        });
-      }
-    }
-
     const group = await prisma.group.findUnique({
       where:   { id },
       include: {
@@ -183,11 +169,11 @@ export default async function groupRoutes(fastify) {
   }, async (request, reply) => {
     const user = request.user;
 
-    if (!isAdminOrAbove(user)) {
+    if (!isMasterUser(user) && !hasPerm(user, 'create_groups')) {
       return reply.code(403).send({
         statusCode: 403,
         error:      'Forbidden',
-        message:    'Only admins can create groups.',
+        message:    'Missing permission: create_groups',
       });
     }
 
@@ -289,11 +275,11 @@ export default async function groupRoutes(fastify) {
     const { id } = request.params;
     const user   = request.user;
 
-    if (!isAdminOrAbove(user)) {
+    if (!isMasterUser(user) && !hasPerm(user, 'delete_groups')) {
       return reply.code(403).send({
         statusCode: 403,
         error:      'Forbidden',
-        message:    'Only admins can deactivate groups.',
+        message:    'Missing permission: delete_groups',
       });
     }
 

@@ -26,8 +26,11 @@ const idParamSchema = {
 export default async function categoryRoutes(fastify) {
   const prisma = fastify.prisma;
 
-  const isAdminOrAbove = (user) =>
-    user.role === 'admin' || user.role === 'superAdmin';
+  const isMasterUser = (user) =>
+    (user?.email?.toLowerCase?.() ?? '') === 'super@erp.com' || user?.role === 'superAdmin';
+
+  const hasPerm = (user, perm) =>
+    Array.isArray(user?.permissions) && user.permissions.includes(perm);
 
   // ── GET /categories ─────────────────────────────────────────────────────────
   fastify.get('/categories', async () => {
@@ -43,11 +46,11 @@ export default async function categoryRoutes(fastify) {
   }, async (request, reply) => {
     const user = request.user;
 
-    if (!isAdminOrAbove(user)) {
+    if (!isMasterUser(user) && !hasPerm(user, 'create_groups')) {
       return reply.code(403).send({
         statusCode: 403,
         error:      'Forbidden',
-        message:    'Only admins can create categories.',
+        message:    'Missing permission: create_groups',
       });
     }
 
@@ -66,11 +69,11 @@ export default async function categoryRoutes(fastify) {
     const user = request.user;
     const { id } = request.params;
 
-    if (!isAdminOrAbove(user)) {
+    if (!isMasterUser(user) && !hasPerm(user, 'delete_groups')) {
       return reply.code(403).send({
         statusCode: 403,
         error:      'Forbidden',
-        message:    'Only admins can delete categories.',
+        message:    'Missing permission: delete_groups',
       });
     }
 

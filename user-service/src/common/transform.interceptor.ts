@@ -7,10 +7,7 @@ import {
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-/**
- * Wraps every successful response in the universal JSON schema:
- * { statusCode, intOpCode: "SxUS{code}", data }
- */
+
 @Injectable()
 export class TransformInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {

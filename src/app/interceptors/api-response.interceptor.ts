@@ -1,10 +1,7 @@
 import { HttpInterceptorFn, HttpResponse } from '@angular/common/http';
 import { map } from 'rxjs';
 
-/**
- * Unwraps the universal JSON response schema { statusCode, intOpCode, data }
- * so that service methods receive the `data` payload directly.
- */
+
 export const apiResponseInterceptor: HttpInterceptorFn = (req, next) => {
   return next(req).pipe(
     map(event => {

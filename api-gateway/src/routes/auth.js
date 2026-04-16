@@ -29,6 +29,30 @@ function tokenTtl(decoded) {
   return remaining > 0 ? remaining : 0;
 }
 
+async function fetchLiveUserFromService(user) {
+  if (!user?.id) return user;
+
+  const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+  const response = await fetch(`${userServiceUrl}/users/profile/me`, {
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      'x-user': JSON.stringify(user),
+    },
+    signal: AbortSignal.timeout(8_000),
+  });
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(body?.message ?? 'Unable to refresh user profile.');
+    error.statusCode = response.status;
+    throw error;
+  }
+
+  return body?.data ?? body;
+}
+
 // ─── Plugin ───────────────────────────────────────────────────────────────────
 
 export default async function authRoutes(fastify) {
@@ -91,7 +115,10 @@ export default async function authRoutes(fastify) {
         `${userServiceUrl}/internal/verify-credentials`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-Secret': process.env.INTERNAL_SECRET || '',
+          },
           body: JSON.stringify({ email, password }),
           signal: AbortSignal.timeout(8_000),
         }
@@ -175,12 +202,12 @@ export default async function authRoutes(fastify) {
     const ttl     = tokenTtl(decoded);
 
     if (ttl > 0) {
-      // Blacklist the token until it would have naturally expired
-      await fastify.redis.set(`blacklist:${token}`, '1', 'EX', ttl);
-      fastify.log.info(
-        { userId: decoded?.id, ttl },
-        '[auth/logout] token blacklisted'
-      );
+      try {
+        await fastify.redis.set(`blacklist:${token}`, '1', 'EX', ttl);
+        fastify.log.info({ userId: decoded?.id, ttl }, '[auth/logout] token blacklisted');
+      } catch {
+        fastify.log.warn('[auth/logout] Redis unavailable, token not blacklisted');
+      }
     }
 
     return reply.code(200).send({
@@ -207,16 +234,34 @@ export default async function authRoutes(fastify) {
     // Also check blacklist so a logged-out token cannot call /me
     const token = extractToken(request);
     if (token) {
-      const blacklisted = await fastify.redis.get(`blacklist:${token}`);
-      if (blacklisted) {
-        return reply.code(401).send({
-          statusCode: 401,
-          intOpCode:  'SxGW401',
-          data:       null,
-          error:      'Unauthorized',
-          message:    'Token has been revoked. Please log in again.',
-        });
+      try {
+        const blacklisted = await fastify.redis.get(`blacklist:${token}`);
+        if (blacklisted) {
+          return reply.code(401).send({
+            statusCode: 401,
+            intOpCode:  'SxGW401',
+            data:       null,
+            error:      'Unauthorized',
+            message:    'Token has been revoked. Please log in again.',
+          });
+        }
+      } catch {
+        // Redis unavailable — skip blacklist check in dev
+        fastify.log.warn('[auth/me] Redis unavailable, skipping blacklist check');
       }
+    }
+
+    try {
+      request.user = await fetchLiveUserFromService(request.user);
+    } catch (err) {
+      fastify.log.error({ err: err.message, userId: request.user?.id }, '[auth/me] failed to refresh user');
+      return reply.code(503).send({
+        statusCode: 503,
+        intOpCode:  'SxGW503',
+        data:       null,
+        error:      'Service Unavailable',
+        message:    'Unable to refresh your latest profile right now. Please try again shortly.',
+      });
     }
 
     return reply.code(200).send({

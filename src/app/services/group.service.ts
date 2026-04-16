@@ -7,6 +7,7 @@ import {
 } from '../models/group.model';
 import { ApiResponse } from '../models/user.model';
 import { environment } from '../../environments/environment';
+import { SYSTEM_USERS } from './auth.service';
 
 export interface GroupFilters {
     category_id?: string;
@@ -79,8 +80,11 @@ export class GroupService {
     // ── Miembros ───────────────────────────────────────────────────────────────
 
     getMembers(groupId: string): Observable<GroupMember[]> {
-        return this.http.get<any[]>(`${this.apiUrl}/api/groups/${groupId}/members`).pipe(
-            map(dtos => dtos.map(d => this._mapMember(d)))
+        return this.http.get<any>(`${this.apiUrl}/api/groups/${groupId}/members`).pipe(
+            map(response => {
+                const rawList = Array.isArray(response) ? response : (response?.data ?? []);
+                return rawList.map((d: any) => this._mapMember(d));
+            })
         );
     }
 
@@ -229,11 +233,13 @@ export class GroupService {
     }
 
     private _mapMember(dto: any): GroupMember {
+        const userId = dto.user_id ?? dto.id;
+        const sysUser = SYSTEM_USERS().find(u => u.id === userId);
         return {
-            id:       dto.user_id ?? dto.id,
-            username: dto.user?.email?.split('@')[0] ?? dto.username ?? '',
-            name:     dto.user?.name  ?? dto.name  ?? '',
-            email:    dto.user?.email ?? dto.email ?? '',
+            id:       userId,
+            username: dto.user?.email?.split('@')[0] ?? dto.username ?? sysUser?.username ?? '',
+            name:     dto.user?.name  ?? dto.name  ?? sysUser?.name ?? 'Usuario Desconocido',
+            email:    dto.user?.email ?? dto.email ?? sysUser?.email ?? '',
             role:     dto.role === 'admin' || dto.role === 'owner' ? 'admin' : 'user',
         };
     }

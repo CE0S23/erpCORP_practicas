@@ -19,6 +19,7 @@ services:
       - "3000:3000"
     env_file: ./api-gateway/.env
     environment:
+      NODE_ENV: production
       REDIS_URL: redis://redis:6379
       USER_SERVICE_URL: http://user-service:3001
       GROUPS_SERVICE_URL: http://groups-service:3002
@@ -26,6 +27,17 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      user-service:
+        condition: service_healthy
+      groups-service:
+        condition: service_healthy
+      tickets-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
   user-service:
@@ -33,6 +45,11 @@ services:
     ports:
       - "3001:3001"
     env_file: ./user-service/.env
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
   groups-service:
@@ -42,6 +59,11 @@ services:
     env_file: ./groups-service/.env
     environment:
       NODE_ENV: production
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
   tickets-service:
@@ -51,6 +73,11 @@ services:
     env_file: ./tickets-service/.env
     environment:
       NODE_ENV: production
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
 volumes:
