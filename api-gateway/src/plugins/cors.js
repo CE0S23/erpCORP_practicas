@@ -1,24 +1,24 @@
 import fp from 'fastify-plugin';
-import fastifyCors from '@fastify/cors';
+import cors from '@fastify/cors';
 
-/**
- * CORS — allows the Angular dev server and any configured frontend origin.
- */
-async function corsPlugin(fastify) {
-  await fastify.register(fastifyCors, {
-    origin: [
-      'http://localhost:4200',
-      'http://localhost:4000',
-      'https://erp-corp-practicas.vercel.app',
-      'https://erp-corp-practicas-u8p8-9fclsb5yv-2023371167-5031s-projects.vercel.app',
-      /\.vercel\.app$/,
-    ],
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
-    exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
+export default fp(async function corsPlugin(fastify) {
+  await fastify.register(cors, {
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (
+        origin.includes('localhost') ||
+        origin.includes('vercel.app') ||
+        origin.includes('railway.app')
+      ) {
+        return cb(null, true);
+      }
+      return cb(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
-    maxAge: 86400, // preflight cache: 24 h
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+    exposedHeaders: ['Set-Cookie'],
+    preflight: true,
+    strictPreflight: false,
   });
-}
-
-export default fp(corsPlugin, { name: 'cors' });
+});
