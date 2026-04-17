@@ -8,8 +8,8 @@ COPY user-service/nest-cli.json ./
 COPY user-service/src ./src
 COPY user-service/prisma ./prisma
 RUN npx prisma generate
-RUN ./node_modules/.bin/nest build
+RUN ./node_modules/.bin/nest build && ls -la && ls -la dist/ || echo "dist not found"
 RUN npm prune --production
 ENV NODE_ENV=production
 EXPOSE 3001
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
