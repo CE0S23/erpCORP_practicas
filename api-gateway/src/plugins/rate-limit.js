@@ -2,22 +2,28 @@ import fp from 'fastify-plugin';
 import fastifyRateLimit from '@fastify/rate-limit';
 
 /**
- * Rate limit — global 100 req/min stored in Redis.
- * Individual routes can override via:  config: { rateLimit: { max, timeWindow } }
+ * Rate limit — global 100 req/min per IP.
  *
- * Depends on: redis plugin (fastify.redisClient must be decorated first).
+ * Store selection (decided at startup):
+ *   - REDIS_URL set   → uses fastify.redisClient (ioredis) as distributed store
+ *   - REDIS_URL unset → uses @fastify/rate-limit's default in-memory store
+ *
+ * Individual routes can override via: config: { rateLimit: { max, timeWindow } }
  */
 async function rateLimitPlugin(fastify) {
+  const useRedis = !!process.env.REDIS_URL;
+
+  fastify.log.info(`[rate-limit] store: ${useRedis ? 'Redis' : 'in-memory'}`);
+
   await fastify.register(fastifyRateLimit, {
     global: true,
     max: 100,
     timeWindow: '1 minute',
-    redis: fastify.redisClient,
-    // Key generator: per IP by default
+    ...(useRedis ? { redis: fastify.redisClient } : {}),
     keyGenerator(request) {
       return request.ip;
     },
-    errorResponseBuilder(request, context) {
+    errorResponseBuilder(_request, context) {
       return {
         statusCode: 429,
         intOpCode:  'SxGW429',
@@ -27,13 +33,11 @@ async function rateLimitPlugin(fastify) {
         retryAfter: Math.ceil(context.ttl / 1000),
       };
     },
-    // Fail open if Redis is unavailable: don't block requests
-    allowList: [],
     skipOnError: true,
   });
 }
 
 export default fp(rateLimitPlugin, {
-  name: 'rate-limit',
+  name:         'rate-limit',
   dependencies: ['redis'],
 });
