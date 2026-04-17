@@ -13,4 +13,4 @@ RUN ./node_modules/.bin/nest build
 RUN ls -la dist/ && ls -la dist/src/ || echo "ERROR: dist structure unexpected"
 RUN npm prune --production
 EXPOSE 3001
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
+CMD ["sh", "-c", "echo '=== DIST CONTENTS ===' && ls -la dist/ && ls -la dist/src/ && npx prisma migrate deploy && node dist/src/main.js"]
