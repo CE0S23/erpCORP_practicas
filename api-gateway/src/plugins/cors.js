@@ -7,8 +7,11 @@ import fastifyCors from '@fastify/cors';
 async function corsPlugin(fastify) {
   await fastify.register(fastifyCors, {
     origin: [
-      'http://localhost:4200',  // Angular dev server
-      'http://localhost:4000',  // Secondary frontend / SSR
+      'http://localhost:4200',
+      'http://localhost:4000',
+      'https://erp-corp-practicas.vercel.app',
+      'https://erp-corp-practicas-u8p8-9fclsb5yv-2023371167-5031s-projects.vercel.app',
+      /\.vercel\.app$/,
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
