@@ -207,6 +207,7 @@ const PORT = parseInt(process.env.PORT ?? '3000', 10);
 
 try {
   await fastify.listen({ host: HOST, port: PORT });
+  console.log('Server listening on port', PORT);
   fastify.log.info(`[server] API Gateway listening on http://${HOST}:${PORT}`);
 } catch (err) {
   fastify.log.error({ err }, '[server] failed to start');
