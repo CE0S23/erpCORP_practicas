@@ -9,6 +9,6 @@ COPY user-service/nest-cli.json ./
 COPY user-service/src ./src
 COPY user-service/prisma ./prisma
 RUN npx prisma generate
-RUN npm run build
+RUN npx nest build
 EXPOSE 3001
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
