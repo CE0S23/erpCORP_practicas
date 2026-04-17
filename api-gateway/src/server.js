@@ -48,10 +48,23 @@ const fastify = Fastify({
   trustProxy: true,
 });
 
+// ─── Explicit OPTIONS preflight handler ──────────────────────────────────────
+fastify.addHook('onRequest', async (request, reply) => {
+  if (request.method === 'OPTIONS') {
+    reply
+      .header('Access-Control-Allow-Origin', request.headers.origin || '*')
+      .header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
+      .header('Access-Control-Allow-Headers', 'Content-Type,Authorization,Cookie')
+      .header('Access-Control-Allow-Credentials', 'true')
+      .code(204)
+      .send();
+  }
+});
+
 // ─── Plugin registration (order matters) ─────────────────────────────────────
-// helmet & cors first — applied before any processing
-fastify.register(helmetPlugin);
+// CORS must be first — before helmet, rate-limit, and jwt
 fastify.register(corsPlugin);
+fastify.register(helmetPlugin);
 
 // redis before rate-limit (rate-limit depends on fastify.redisClient decorator)
 fastify.register(redisPlugin);
