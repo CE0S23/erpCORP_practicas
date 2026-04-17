@@ -28,7 +28,7 @@ const logger = isDev
       },
       level: 'debug',
     }
-  : { level: 'info' };
+  : true;
 
 // ─── Fastify instance ─────────────────────────────────────────────────────────
 const fastify = Fastify({

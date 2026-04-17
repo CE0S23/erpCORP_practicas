@@ -12,6 +12,7 @@ RUN npm run build
 
 # ── Production stage ──────────────────────────────────────────────────────────
 FROM node:20-alpine
+ENV NODE_ENV=production
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY user-service/package*.json ./
