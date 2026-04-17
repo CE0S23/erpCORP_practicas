@@ -1,3 +1,7 @@
+console.log('=== API GATEWAY STARTING ===');
+console.log('PORT:', process.env.PORT);
+console.log('NODE_ENV:', process.env.NODE_ENV);
+
 import 'dotenv/config';
 import Fastify from 'fastify';
 
