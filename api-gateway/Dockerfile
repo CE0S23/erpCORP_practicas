@@ -1,7 +1,7 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package*.json ./
+COPY api-gateway/package*.json ./
 RUN npm install --omit=dev --legacy-peer-deps
-COPY . .
+COPY api-gateway/src ./src
 EXPOSE 3000
 CMD ["node", "src/server.js"]

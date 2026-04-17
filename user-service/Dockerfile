@@ -1,9 +1,12 @@
 # ── Build stage ──────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
+COPY user-service/package*.json ./
 RUN npm install --legacy-peer-deps
-COPY . .
+COPY user-service/prisma ./prisma
+COPY user-service/src ./src
+COPY user-service/tsconfig*.json ./
+COPY user-service/nest-cli.json ./
 RUN npx prisma generate
 RUN npm run build
 
@@ -11,9 +14,9 @@ RUN npm run build
 FROM node:20-alpine
 RUN apk add --no-cache openssl
 WORKDIR /app
-COPY package*.json ./
+COPY user-service/package*.json ./
 RUN npm install --omit=dev --legacy-peer-deps
-COPY prisma ./prisma
+COPY user-service/prisma ./prisma
 RUN npx prisma generate
 COPY --from=builder /app/dist ./dist
 EXPOSE 3001
