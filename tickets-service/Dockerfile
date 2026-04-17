@@ -2,7 +2,7 @@ FROM node:20-alpine
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --omit=dev
+RUN npm install --omit=dev --legacy-peer-deps
 COPY . .
 RUN npx prisma generate
 EXPOSE 3003
