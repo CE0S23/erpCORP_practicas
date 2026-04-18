@@ -1,7 +1,3 @@
-console.log('=== API GATEWAY STARTING ===');
-console.log('PORT:', process.env.PORT);
-console.log('NODE_ENV:', process.env.NODE_ENV);
-
 import 'dotenv/config';
 import Fastify from 'fastify';
 
@@ -34,7 +30,7 @@ const logger = isDev
       },
       level: 'debug',
     }
-  : true;
+  : { level: 'info' };
 
 // ─── Fastify instance ─────────────────────────────────────────────────────────
 
@@ -48,23 +44,10 @@ const fastify = Fastify({
   trustProxy: true,
 });
 
-// ─── Explicit OPTIONS preflight handler ──────────────────────────────────────
-fastify.addHook('onRequest', async (request, reply) => {
-  if (request.method === 'OPTIONS') {
-    reply
-      .header('Access-Control-Allow-Origin', request.headers.origin || '*')
-      .header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
-      .header('Access-Control-Allow-Headers', 'Content-Type,Authorization,Cookie')
-      .header('Access-Control-Allow-Credentials', 'true')
-      .code(204)
-      .send();
-  }
-});
-
 // ─── Plugin registration (order matters) ─────────────────────────────────────
-// CORS must be first — before helmet, rate-limit, and jwt
-fastify.register(corsPlugin);
+// helmet & cors first — applied before any processing
 fastify.register(helmetPlugin);
+fastify.register(corsPlugin);
 
 // redis before rate-limit (rate-limit depends on fastify.redisClient decorator)
 fastify.register(redisPlugin);
@@ -224,7 +207,6 @@ const PORT = parseInt(process.env.PORT ?? '3000', 10);
 
 try {
   await fastify.listen({ host: HOST, port: PORT });
-  console.log('Server listening on port', PORT);
   fastify.log.info(`[server] API Gateway listening on http://${HOST}:${PORT}`);
 } catch (err) {
   fastify.log.error({ err }, '[server] failed to start');

@@ -1,8 +1,0 @@
-{
-  "buildCommand": "npm run build -- --configuration production",
-  "outputDirectory": "dist/erpCesarRamirez/browser",
-  "framework": "angular",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}

@@ -1,11 +1,9 @@
 FROM node:20-alpine
-ENV NODE_ENV=production
 RUN apk add --no-cache openssl
 WORKDIR /app
-COPY tickets-service/package*.json ./
-RUN npm install --omit=dev --legacy-peer-deps
-COPY tickets-service/prisma ./prisma
-COPY tickets-service/src ./src
+COPY package*.json ./
+RUN npm install --omit=dev
+COPY . .
 RUN npx prisma generate
 EXPOSE 3003
 CMD ["sh", "-c", "npx prisma migrate deploy && node src/server.js"]

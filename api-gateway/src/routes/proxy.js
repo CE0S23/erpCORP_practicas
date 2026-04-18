@@ -22,11 +22,6 @@ const PERMISSION_MAP = {
   'PATCH /api/users':  'edit_user',
   'DELETE /api/users': 'delete_users',
 
-  // Group permissions sub-resource (GET is open to any authenticated user)
-  'GET /api/users/group-permissions':    'view_users',
-  'PUT /api/users/group-permissions':    'edit_user',
-  'DELETE /api/users/group-permissions': 'edit_user',
-
   // Groups
   'GET /api/groups':    'view_groups',
   'POST /api/groups':   'create_groups',
@@ -53,24 +48,15 @@ const LEGACY_PERMISSION_ALIASES = {
   edit_tickets:   ['edit_tickets', 'manage_tickets'],
   delete_tickets: ['delete_tickets', 'manage_tickets'],
 
-  // Canonical requirement strings — aliases to the internal permission keys
-  'tickets:add':  ['create_tickets', 'manage_tickets'],
-  'tickets:move': ['edit_tickets', 'manage_tickets'],
-  'tickets:view': ['view_tickets', 'manage_tickets'],
-
   view_groups:    ['view_groups', 'manage_groups'],
   create_groups:  ['create_groups', 'manage_groups'],
   edit_groups:    ['edit_groups', 'manage_groups'],
   delete_groups:  ['delete_groups', 'manage_groups'],
 
-  'groups:manage': ['create_groups', 'edit_groups', 'delete_groups', 'manage_groups'],
-
   view_users:     ['view_users', 'manage_users'],
   create_users:   ['create_users', 'manage_users'],
   edit_user:      ['edit_user', 'manage_users'],
   delete_users:   ['delete_users', 'manage_users'],
-
-  'users:manage': ['create_users', 'edit_user', 'delete_users', 'manage_users'],
 };
 
 // ─── Service routing ─────────────────────────────────────────────────────────
@@ -96,34 +82,6 @@ function isMasterUser(user) {
 function hasRequiredPermission(userPermissions, requiredPermission) {
   const allowedKeys = LEGACY_PERMISSION_ALIASES[requiredPermission] ?? [requiredPermission];
   return userPermissions.some((perm) => allowedKeys.includes(perm));
-}
-
-/**
- * Checks permission with optional group-scope fallback to global permissions.
- * If groupId is provided, first checks user.groupPermissions[groupId],
- * then falls back to global user.permissions.
- */
-function hasPermissionForGroup(user, requiredPermission, groupId) {
-  const allowedKeys = LEGACY_PERMISSION_ALIASES[requiredPermission] ?? [requiredPermission];
-
-  if (groupId && user.groupPermissions && user.groupPermissions[groupId]) {
-    const groupPerms = user.groupPermissions[groupId];
-    if (allowedKeys.some(k => groupPerms.includes(k))) return true;
-  }
-
-  // Fallback to global permissions
-  const globalPerms = Array.isArray(user.permissions) ? user.permissions : [];
-  return allowedKeys.some(k => globalPerms.includes(k));
-}
-
-/**
- * Extracts groupId from request (query → body → params).
- */
-function extractGroupId(request) {
-  return request.query?.groupId
-    ?? request.body?.groupId
-    ?? request.params?.groupId
-    ?? null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -174,7 +132,6 @@ async function fetchLiveUser(requestUser) {
 export default async function proxyRoutes(fastify) {
   // ── Hook 1: JWT verification ─────────────────────────────────────────────
   fastify.addHook('onRequest', async (request, reply) => {
-    if (request.method === 'OPTIONS') return;
     try {
       await request.jwtVerify();
     } catch (err) {
@@ -190,7 +147,6 @@ export default async function proxyRoutes(fastify) {
 
   // ── Hook 2: Token blacklist check ────────────────────────────────────────
   fastify.addHook('onRequest', async (request, reply) => {
-    if (request.method === 'OPTIONS') return;
     const token = extractToken(request);
     if (!token) return; // Already rejected by JWT hook above
 
@@ -226,7 +182,7 @@ export default async function proxyRoutes(fastify) {
       });
     }
 
-    const { resource, targetPath } = parseProxyUrl(request.raw.url);
+    const { resource } = parseProxyUrl(request.raw.url);
     const permKey = `${request.method} /api/${resource}`;
     const required = PERMISSION_MAP[permKey];
 
@@ -242,75 +198,19 @@ export default async function proxyRoutes(fastify) {
 
     if (isMasterUser(request.user)) return;
 
-    const groupId = extractGroupId(request);
     const userPermissions = Array.isArray(request.user?.permissions) ? request.user.permissions : [];
-
-    if (!hasPermissionForGroup(request.user, required, groupId)) {
+    if (!hasRequiredPermission(userPermissions, required)) {
       fastify.log.warn(
-        { userId: request.user?.id, required, userPermissions, groupId },
+        { userId: request.user?.id, required, userPermissions },
         '[proxy] permission denied'
       );
-      const groupCtx = groupId ? ` for group "${groupId}"` : '';
       return reply.code(403).send({
         statusCode: 403,
         intOpCode:  'SxGW403',
         data:       null,
         error:      'Forbidden',
-        message:    `You do not have the required permission: ${required}${groupCtx}`,
+        message:    `You do not have the required permission: ${required}`,
       });
-    }
-
-    // ── Special rule: PATCH /tickets/:id/status requires tickets:move
-    //    AND the ticket must be assigned to the requesting user.
-    //    We enforce the assignee constraint here at the gateway level
-    //    by fetching the ticket from the tickets service before proxying.
-    const isTicketStatusPatch =
-      request.method === 'PATCH' &&
-      resource === 'tickets' &&
-      /^\/[^/]+\/status(\/|$|\?)/.test(targetPath);
-
-    if (isTicketStatusPatch && !isMasterUser(request.user)) {
-      const ticketId = targetPath.split('/').filter(Boolean)[1];
-
-      // Fetch the ticket to get its groupId for group-scoped permission check
-      let ticketGroupId = groupId;
-      if (ticketId) {
-        try {
-          const ticketsUrl = process.env.TICKETS_SERVICE_URL || 'http://localhost:3003';
-          const ticketRes = await fetch(`${ticketsUrl}/tickets/${ticketId}`, {
-            headers: { 'x-user': JSON.stringify(request.user), accept: 'application/json' },
-            signal: AbortSignal.timeout(5_000),
-          });
-          if (ticketRes.ok) {
-            const ticketBody = await ticketRes.json().catch(() => ({}));
-            const ticket = ticketBody?.data ?? ticketBody;
-
-            ticketGroupId = ticket?.group_id ?? ticket?.groupId ?? groupId;
-
-            if (ticket?.assignee_id && ticket.assignee_id !== request.user.id) {
-              return reply.code(403).send({
-                statusCode: 403,
-                intOpCode:  'SxGW403',
-                data:       null,
-                error:      'Forbidden',
-                message:    'You can only move tickets that are assigned to you.',
-              });
-            }
-          }
-        } catch (err) {
-          fastify.log.warn({ err: err.message }, '[proxy] could not verify ticket assignee for status move');
-        }
-      }
-
-      if (!hasPermissionForGroup(request.user, 'edit_tickets', ticketGroupId)) {
-        return reply.code(403).send({
-          statusCode: 403,
-          intOpCode:  'SxGW403',
-          data:       null,
-          error:      'Forbidden',
-          message:    'Moving a ticket status requires the "tickets:move" permission for this group.',
-        });
-      }
     }
   });
 

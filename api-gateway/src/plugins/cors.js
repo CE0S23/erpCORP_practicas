@@ -1,24 +1,21 @@
 import fp from 'fastify-plugin';
-import cors from '@fastify/cors';
+import fastifyCors from '@fastify/cors';
 
-export default fp(async function corsPlugin(fastify) {
-  await fastify.register(cors, {
-    origin: (origin, cb) => {
-      if (!origin) return cb(null, true);
-      if (
-        origin.includes('localhost') ||
-        origin.includes('vercel.app') ||
-        origin.includes('railway.app')
-      ) {
-        return cb(null, true);
-      }
-      return cb(new Error('Not allowed by CORS'), false);
-    },
-    credentials: true,
+/**
+ * CORS — allows the Angular dev server and any configured frontend origin.
+ */
+async function corsPlugin(fastify) {
+  await fastify.register(fastifyCors, {
+    origin: [
+      'http://localhost:4200',  // Angular dev server
+      'http://localhost:4000',  // Secondary frontend / SSR
+    ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-    exposedHeaders: ['Set-Cookie'],
-    preflight: true,
-    strictPreflight: false,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+    exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
+    credentials: true,
+    maxAge: 86400, // preflight cache: 24 h
   });
-});
+}
+
+export default fp(corsPlugin, { name: 'cors' });
