@@ -1,7 +1,9 @@
 import { Component, inject, signal, computed, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { CdkDrag, CdkDropList, CdkDropListGroup, CdkDragPlaceholder, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ConfirmationService, MessageService } from 'primeng/api';
+import { SelectButtonModule } from 'primeng/selectbutton';
 import { TicketService } from '../../services/ticket.service';
 import { TicketUtilsService } from '../../services/ticket-utils.service';
 import { GroupService } from '../../services/group.service';
@@ -21,7 +23,9 @@ import { PRIMENG_MODULES } from '../../primeng';
     imports: [
         CommonModule,
         FormsModule,
+        SelectButtonModule,
         HasPermissionDirective,
+        CdkDrag, CdkDropList, CdkDropListGroup, CdkDragPlaceholder,
         ...PRIMENG_MODULES,
     ],
     templateUrl: './tickets.html',
@@ -49,6 +53,24 @@ export class TicketsPage implements OnInit {
     readonly today      = new Date();
 
     readonly activeFilter = signal<'all' | 'mine' | 'unassigned' | 'high'>('all');
+
+    // ── Vista Kanban / Lista ──────────────────────────────────────────────────
+    readonly viewMode = signal<'list' | 'kanban'>('list');
+    viewModeValue: 'list' | 'kanban' = 'list';
+    readonly viewModeOptions = [
+        { label: 'Lista',  value: 'list',   icon: 'pi pi-list'    },
+        { label: 'Kanban', value: 'kanban', icon: 'pi pi-th-large' },
+    ];
+
+    readonly kanbanStatuses: TicketStatus[] = ['Pendiente', 'En progreso', 'Revisión', 'Finalizado'];
+
+    readonly ticketsByStatus = computed(() => {
+        const map: Record<TicketStatus, Ticket[]> = {
+            Pendiente: [], 'En progreso': [], 'Revisión': [], Finalizado: [],
+        };
+        this.filteredTickets().forEach(t => { if (map[t.status]) map[t.status].push(t); });
+        return map;
+    });
 
     readonly filteredTickets = computed(() => {
         const all    = this.tickets();
@@ -78,7 +100,6 @@ export class TicketsPage implements OnInit {
     editingId: string | null = null;
     submitted = false;
     draft = this.emptyDraft();
-    /** Lista de miembros del grupo seleccionado — signal para que memberOptions sea reactivo */
     readonly availableMembers = signal<GroupMember[]>([]);
 
     readonly statusOptions   = this.ticketService.statuses.map(s => ({ label: s, value: s }));
@@ -91,7 +112,6 @@ export class TicketsPage implements OnInit {
         const members  = this.availableMembers();
         const sysUsers = SYSTEM_USERS();
         return members.map(m => {
-            // Enriquecer con datos de SYSTEM_USERS cuando estén disponibles (admin)
             const sys   = sysUsers.find(u => u.id === m.id);
             const label = sys?.name || m.name || m.email || m.id;
             return { label, value: m.id };
@@ -121,8 +141,34 @@ export class TicketsPage implements OnInit {
         return TicketsPage.UUID_REGEX.test(value);
     }
 
-    statusSeverity(s: TicketStatus)   { return this.utils.statusSeverity(s);   }
-    prioritySeverity(p: TicketPriority){ return this.utils.prioritySeverity(p); }
+    statusSeverity(s: TicketStatus)    { return this.utils.statusSeverity(s);   }
+    prioritySeverity(p: TicketPriority) { return this.utils.prioritySeverity(p); }
+
+    // ── Kanban drag helpers ───────────────────────────────────────────────────
+
+    canMoveTicket(ticket: Ticket): boolean {
+        if (this.permissions.isAdmin) return true;
+        const userId = this.authService.currentUser()?.id ?? '';
+        return this.permissions.hasPermission('edit_tickets') && ticket.assignedTo === userId;
+    }
+
+    dropTicket(event: CdkDragDrop<Ticket[]>, newStatus: TicketStatus): void {
+        const ticket = event.item.data as Ticket;
+        if (!this.canMoveTicket(ticket)) {
+            this.messageService.add({
+                severity: 'warn', summary: 'Sin permisos',
+                detail: 'Solo puedes mover tickets asignados a ti.', life: 3000,
+            });
+            return;
+        }
+        if (event.previousContainer === event.container) return;
+        this.ticketService.updateStatus(ticket.id, newStatus, '').subscribe({
+            next: () => this.messageService.add({
+                severity: 'success', summary: 'Ticket movido',
+                detail: `Estado → ${newStatus}`, life: 2000,
+            }),
+        });
+    }
 
     ngOnInit(): void {
         this.ticketService.getTickets().subscribe({
@@ -141,7 +187,6 @@ export class TicketsPage implements OnInit {
         this._loadGroupMembers(this.draft.groupId);
     }
 
-    /** Carga miembros del grupo en availableMembers sin modificar asignación actual */
     private _loadGroupMembers(groupId: string): void {
         if (!groupId) {
             this.availableMembers.set([]);
@@ -151,13 +196,11 @@ export class TicketsPage implements OnInit {
         const group        = this.groups().find(g => g.id === groupId);
         const localMembers = group?.memberList ?? [];
 
-        // Usar memberList local si ya tiene nombres (evitar petición extra)
         if (localMembers.length > 0 && localMembers.some(m => m.name)) {
             this.availableMembers.set(localMembers);
             return;
         }
 
-        // Obtener miembros desde la API y enriquecer con SYSTEM_USERS
         this.groupService.getMembers(groupId).subscribe({
             next: members => {
                 const sysUsers = SYSTEM_USERS();
@@ -242,7 +285,6 @@ export class TicketsPage implements OnInit {
         this.submitted     = false;
         this.detailVisible = false;
         this.formVisible   = true;
-        // Cargar miembros del grupo sin resetear la asignación actual
         this._loadGroupMembers(ticket.groupId);
     }
 
@@ -260,7 +302,7 @@ export class TicketsPage implements OnInit {
         if (!this.draft.groupId || !this.isUuid(this.draft.groupId)) {
             this.messageService.add({
                 severity: 'warn', summary: 'Campo requerido',
-                detail: 'Selecciona un grupo vÃ¡lido.', life: 3000,
+                detail: 'Selecciona un grupo válido.', life: 3000,
             });
             return;
         }

@@ -22,6 +22,23 @@
   @if (isLoading()) {
     <p-skeleton width="100%" height="25rem"></p-skeleton>
   } @else {
+
+    <!-- Toggle Lista / Kanban + acciones -->
+    <div class="view-toolbar">
+      <p-selectButton [options]="viewModeOptions" [(ngModel)]="viewModeValue" optionLabel="label" optionValue="value" (onChange)="viewMode.set($event.value)">
+        <ng-template pTemplate="item" let-opt>
+          <i [class]="opt.icon"></i> {{ opt.label }}
+        </ng-template>
+      </p-selectButton>
+      <div class="table-actions">
+        <ng-container *hasPermission="'create_tickets'">
+          <p-button label="Nuevo Ticket" icon="pi pi-plus" (onClick)="openCreate()" />
+        </ng-container>
+      </div>
+    </div>
+
+    <!-- ── VISTA LISTA ── -->
+    @if (viewMode() === 'list') {
     <p-table
       [value]="filteredTickets()"
       [paginator]="true"
@@ -41,9 +58,6 @@
               <input pInputText type="text" (input)="dt.filterGlobal($any($event.target).value, 'contains')" placeholder="Buscar ticket..." />
             </span>
             <p-button label="Exportar CSV" icon="pi pi-download" severity="secondary" [outlined]="true" (onClick)="dt.exportCSV()" />
-            <ng-container *hasPermission="'create_tickets'">
-              <p-button label="Nuevo Ticket" icon="pi pi-plus" (onClick)="openCreate()" />
-            </ng-container>
           </div>
         </div>
       </ng-template>
@@ -107,6 +121,52 @@
         </tr>
       </ng-template>
     </p-table>
+    }
+
+    <!-- ── VISTA KANBAN ── -->
+    @if (viewMode() === 'kanban') {
+    <div class="kanban-wrapper">
+      <div class="kanban-board" cdkDropListGroup>
+        @for (status of kanbanStatuses; track status) {
+          <div class="kanban-column">
+            <div class="kanban-column__header">
+              <p-tag [value]="status" [severity]="statusSeverity(status)" />
+              <span class="kanban-count">{{ (ticketsByStatus()[status] || []).length }}</span>
+            </div>
+            <div class="kanban-drop-zone"
+              cdkDropList
+              [cdkDropListData]="ticketsByStatus()[status] || []"
+              (cdkDropListDropped)="dropTicket($event, status)">
+              @for (ticket of ticketsByStatus()[status] || []; track ticket.id) {
+                <div class="kanban-card"
+                  cdkDrag
+                  [cdkDragData]="ticket"
+                  [cdkDragDisabled]="!canMoveTicket(ticket)">
+                  <div class="kanban-card__drag-handle" cdkDragHandle>
+                    <i class="pi pi-bars"></i>
+                  </div>
+                  <div class="kanban-card__body" (click)="openDetail(ticket)">
+                    <span class="kanban-card__title">{{ ticket.titulo }}</span>
+                    <div class="kanban-card__meta">
+                      <p-tag [value]="ticket.priority" [severity]="prioritySeverity(ticket.priority)" />
+                      <span class="kanban-card__assignee">
+                        <i class="pi pi-user"></i> {{ ticket.assignedName || 'Sin asignar' }}
+                      </span>
+                    </div>
+                  </div>
+                  <div *cdkDragPlaceholder class="kanban-card--placeholder"></div>
+                </div>
+              }
+              @if ((ticketsByStatus()[status] || []).length === 0) {
+                <div class="kanban-empty">Sin tickets</div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+    }
+
   }
 </div>
 
@@ -235,6 +295,7 @@
           optionLabel="label"
           optionValue="value"
           placeholder="Seleccionar"
+          appendTo="body"
         />
       </div>
       <div class="form-field">
@@ -245,6 +306,7 @@
           optionLabel="label"
           optionValue="value"
           placeholder="Seleccionar"
+          appendTo="body"
         />
       </div>
     </div>
@@ -259,6 +321,7 @@
         optionValue="value"
         placeholder="Seleccionar grupo"
         [class.ng-invalid]="submitted && !draft.groupId"
+        appendTo="body"
       />
       @if (submitted && !draft.groupId) {
         <small class="error-msg"><i class="pi pi-exclamation-circle"></i> Selecciona un grupo</small>
@@ -275,6 +338,7 @@
         optionValue="value"
         placeholder="Seleccionar miembro"
         [disabled]="!draft.groupId"
+        appendTo="body"
       />
       @if (!draft.groupId) {
         <small class="form-hint-msg">Selecciona un grupo primero</small>
@@ -284,11 +348,11 @@
     <div class="form-row">
       <div class="form-field">
         <label class="form-label">Fecha de Creacion</label>
-        <p-datepicker [(ngModel)]="draft.createdAt" dateFormat="dd/mm/yy" [showIcon]="true" />
+        <p-datepicker [(ngModel)]="draft.createdAt" dateFormat="dd/mm/yy" [showIcon]="true" appendTo="body" />
       </div>
       <div class="form-field">
         <label class="form-label">Fecha Limite <span class="required-star">*</span></label>
-        <p-datepicker [(ngModel)]="draft.dueDate" dateFormat="dd/mm/yy" [showIcon]="true" />
+        <p-datepicker [(ngModel)]="draft.dueDate" dateFormat="dd/mm/yy" [showIcon]="true" appendTo="body" />
       </div>
     </div>
 
